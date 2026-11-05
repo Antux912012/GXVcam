@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  GXVcam device profile: Motorola Edge 50 Neo
+  verified="probe" = read from the real device (serial ZY22LWCQSB, 2026-11-05,
+  Android 16 / SDK 36) with tools/mtk_camera_probe.py. Raw data: probe_out/edge50neo/.
+  The app still reads all calibration from CameraCharacteristics at runtime;
+  this file documents expectations and drives lens-role mapping.
+-->
+<gxvcam_profile version="2">
+  <device model="motorola edge 50 neo" product="vienna_g_syses" codename="vienna"
+          soc="MT6878 (Dimensity 7300)" tested_sdk="36" min_sdk="34" verified="probe"/>
+
+  <cameras>
+    <!-- Main: Sony IMX896 (marketed LYT-700C). Quad-Bayer, HW remosaic. -->
+    <camera role="main" id="0" sensor="imx896" facing="back" hw_level="FULL" verified="probe">
+      <raw format="RAW_SENSOR" size="4096x3072" cfa="BGGR" white_level="1023" black_level="64,64,64,64"/>
+      <focal_length_mm>5.56</focal_length_mm>
+      <iso_range>100-19200</iso_range>
+      <exposure_range_ns std="100000-400000000" vendor_max="32000000000"/>
+      <quad_cfa full_size="8192x6144" remosaic_by_hw="true"
+                high_res_sizes="8192x6144,8192x4590,8192x3686"/>
+    </camera>
+
+    <!-- Ultrawide: GalaxyCore GC13A2 -->
+    <camera role="ultrawide" id="2" sensor="gc13a2" facing="back" hw_level="FULL" verified="probe">
+      <raw format="RAW_SENSOR" size="4160x3120" cfa="GBRG" white_level="1023" black_level="64,64,64,64"/>
+      <focal_length_mm>2.13</focal_length_mm>
+      <iso_range>100-8000</iso_range>
+    </camera>
+
+    <!-- Telephoto 3x: Samsung S5K3K1 -->
+    <camera role="tele" id="3" sensor="s5k3k1" facing="back" hw_level="FULL" verified="probe">
+      <raw format="RAW_SENSOR" size="3648x2736" cfa="GRBG" white_level="1023" black_level="64,64,64,64"/>
+      <focal_length_mm>7.06</focal_length_mm>
+      <iso_range>100-16000</iso_range>
+    </camera>
+
+    <!-- Front: Samsung S5KJD1 (Quad-Bayer) -->
+    <camera role="front" id="1" sensor="s5kjd1" facing="front" hw_level="FULL" verified="probe">
+      <raw format="RAW_SENSOR" size="3280x2460" cfa="GRBG" white_level="1023" black_level="64,64,64,64"/>
+      <focal_length_mm>3.28</focal_length_mm>
+      <iso_range>100-19200</iso_range>
+    </camera>
+
+    <!-- id 4: front, LIMITED, SECURE_IMAGE_DATA only (face unlock) -> ignore -->
+    <!-- id 5: logical back camera, physical ids 0,2,3; use for seamless zoom preview -->
+    <camera role="logical_back" id="5" physical_ids="0,2,3" verified="probe"/>
+  </cameras>
+
+  <capture>
+    <zsl_ring_frames>8</zsl_ring_frames>          <!-- 8 x 4096x3072 RAW16 ~= 200 MB -->
+    <burst_frames day="6" low_light="12" night_max="15"/>
+    <preferred_raw_format>RAW_SENSOR</preferred_raw_format> <!-- RAW10 NOT offered -->
+    <max_std_exposure_ms>400</max_std_exposure_ms>
+  </capture>
+
+  <!--
+    Vendor tags extracted from stock MotCamera5 and HAL probe on Edge 50 Neo.
+  -->
+  <vendor_tags verified="oem_apk_and_hal_probe">
+    <!-- MediaTek ISP Controls -->
+    <tag name="com.mediatek.control.capture.zsl.mode" type="request" values="0,1"/>
+    <tag name="com.mediatek.control.capture.hintForIspFrameCount" type="request"/>
+    <tag name="com.mediatek.control.capture.hintForIspFrameIndex" type="request"/>
+    <tag name="com.mediatek.mfnrfeature.mfbmode" type="request" values="0,1,2,255"/>
+    <tag name="com.mediatek.mfnrfeature.bsscount" type="request"/>
+    <tag name="com.mediatek.3afeature.aeIspGain" type="request"/>
+    <!-- Motorola Custom Controls -->
+    <tag name="com.lenovo.moto.control.capture_zsl_mode" type="request" values="0,1"/>
+    <tag name="com.lenovo.moto.control.supernight" type="request" values="0,1"/>
+    <tag name="com.lenovo.moto.control.raw_nv_se_capture" type="request" values="0,1"/>
+    <tag name="com.lenovo.moto.control.raw_nv_se_frame_number" type="request"/>
+    <tag name="com.lenovo.moto.control.raw_nv_se_ev0_exp_time" type="request"/>
+    <tag name="com.lenovo.moto.adrc.enable" type="request" values="0,1"/>
+    <tag name="com.lenovo.moto.adrc.gain" type="request"/>
+    <tag name="com.lenovo.moto.sensor.info.exposureTimeRange" type="characteristic" values="100000,32000000000"
+         note="vendor long exposure up to 32 s vs 0.4 s via standard API"/>
+    <tag name="com.lenovo.moto.quadra_cfa.do_remosaic" type="request" values="0,1"
+         note="full-res 50MP path via Dimensity 7300 HW remosaic"/>
+  </vendor_tags>
+
+  <look default="natural">
+    <profile id="natural" lut="luts/natural.cube"/>
+    <profile id="vivid" lut="luts/vivid.cube"/>
+    <tone highlight_knee="0.72"/>
+    <skin smoothing="0.40" detail_gain="1.00"/>
+  </look>
+</gxvcam_profile>

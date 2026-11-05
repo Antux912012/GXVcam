@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">GXVcam</string>
+    <string name="camera_permission_required">Camera permission is required to capture photos.</string>
+    <string name="shutter_button">Shutter</string>
+    <string name="mode_photo">Camera</string>
+    <string name="mode_portrait">Portrait</string>
+    <string name="mode_night">Night Sight</string>
+    <string name="mode_pro">Pro</string>
+</resources>

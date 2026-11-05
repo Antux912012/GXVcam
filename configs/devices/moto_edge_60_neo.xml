@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  GXVcam device profile: Motorola Edge 60 Neo
+  Ships with Android 15. SoC MediaTek Dimensity 7400 (same CPU/GPU family as 7300: 4x A78 + 4x A55, Mali-G615 MC2).
+  Same camera line-up class as Edge 50 Neo: tele sensor reported as Samsung S5K3K1 (1/3.94").
+  See moto_edge_50_neo.xml for the rules on verified vs. runtime-derived values.
+-->
+<gxvcam_profile version="2">
+  <device model="motorola edge 60 neo" model_codes="TODO" min_sdk="35"
+          soc="Dimensity 7400" verified="spec"/>
+
+  <cameras>
+    <camera role="main" expected_sensor="Sony LYTIA LYT-700C" mp="50" format='1/1.56"'
+            aperture="1.8" ois="true" verified="spec">
+      <expected_raw binned="4096x3072" full="8192x6144"/>
+      <camera_id verified="no">TODO</camera_id>
+    </camera>
+    <camera role="tele" expected_sensor="Samsung S5K3K1" mp="10" zoom="3x" aperture="2.0" ois="true" verified="spec">
+      <camera_id verified="no">TODO</camera_id>
+    </camera>
+    <camera role="ultrawide" mp="13" fov_deg="120" aperture="2.2" af="true" verified="spec">
+      <camera_id verified="no">TODO</camera_id>
+    </camera>
+    <camera role="front" mp="32" aperture="2.4" verified="spec">
+      <camera_id verified="no">TODO</camera_id>
+    </camera>
+  </cameras>
+
+  <capture>
+    <zsl_ring_frames>8</zsl_ring_frames>
+    <burst_frames day="6" low_light="12" night_max="15"/>
+    <preferred_raw_format>RAW_SENSOR</preferred_raw_format>
+  </capture>
+
+  <vendor_tags verified="no"/>
+
+  <look default="natural">
+    <profile id="natural" lut="luts/natural.cube"/>
+    <profile id="vivid" lut="luts/vivid.cube"/>
+    <tone highlight_knee="0.72"/>
+    <skin smoothing="0.40" detail_gain="1.00"/>
+  </look>
+</gxvcam_profile>

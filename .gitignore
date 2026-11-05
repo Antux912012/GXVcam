@@ -1,0 +1,22 @@
+# Android build outputs & local config
+*.apk
+*.aar
+.gradle/
+build/
+app/build/
+.cxx/
+local.properties
+*.iml
+.idea/
+
+# Large probe dumps & OEM APK analysis (to keep repo lightweight)
+probe_out/*/dumpsys_media_camera.txt
+probe_out/*/all_tags.json
+tools/oem_analysis/*.apk
+tools/oem_analysis/extracted_mcf/
+__pycache__/
+*.pyc
+
+# OS generated files
+.DS_Store
+Thumbs.db

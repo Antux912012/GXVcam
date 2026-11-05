@@ -1,0 +1,31 @@
+== Camera HAL device device@3.7/internal/0 (v3.7) static information: ==
+  Resource cost: 100
+  Conflicting devices: None
+  API1 info:
+    Has a flash unit: true
+    Facing: Back
+    Orientation: 90
+  Device static metadata:
+      android.lens.facing (80005): byte[1]
+        [BACK ]
+      android.info.supportedHardwareLevel (150000): byte[1]
+        [FULL ]
+      android.request.availableCapabilities (c000c): byte[5]
+        [0 1 2 3 6 ]
+      android.sensor.info.colorFilterArrangement (f0000): byte[1]
+        [0 ]
+      android.sensor.info.whiteLevel (f0008): int32[1]
+        [1023 ]
+      android.sensor.blackLevelPattern (e0013): int32[4]
+        [64 64 64 64 ]
+      android.sensor.forwardMatrix1 (e000e): rational[9]
+        [(128 / 128) (0 / 128) (0 / 128) (0 / 128)
+         (128 / 128) (0 / 128) (0 / 128) (0 / 128) (128 / 128) ]
+      android.scaler.availableStreamConfigurations (d000a): int32[12]
+        [32 4096 3072 0 37 4096 3072 0
+         35 1920 1080 0 ]
+      com.mediatek.example.vendorTag (80000000): int32[1]
+        [1 ]
+== Camera device 0 dynamic info: ==
+      android.sensor.dynamicBlackLevel (e0019): float[4]
+        [63.5 64.0 64.0 63.0 ]

@@ -1,0 +1,44 @@
+#version 450
+// Vulkan compute: ImageFormat.RAW10 (MIPI packed) -> normalized float Bayer.
+// Must match src/raw_unpacker.cpp (the CPU reference, unit-tested).
+//
+// One invocation = one 4-pixel / 5-byte group. Input is bound as a uint[]
+// buffer and bytes are extracted manually, so no GL_EXT_shader_8bit_storage
+// is required (works on any Vulkan 1.1+ driver, incl. Mali-G615).
+// Host must pad the input buffer size up to a multiple of 4 bytes.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(std430, binding = 0) readonly buffer InputPacked { uint words[]; };
+layout(std430, binding = 1) writeonly buffer OutputBayer { float px[]; };
+
+layout(push_constant) uniform PC {
+    vec4  black_level;      // per 2x2 CFA position, sensor readout order
+    uint  width;            // must be a multiple of 4
+    uint  height;
+    uint  row_stride_bytes; // Image.Plane.getRowStride()
+    float white_level;
+} pc;
+
+uint read_byte(uint offset) {
+    return (words[offset >> 2] >> ((offset & 3u) * 8u)) & 0xFFu;
+}
+
+void main() {
+    uint g = gl_GlobalInvocationID.x;   // group index within row
+    uint y = gl_GlobalInvocationID.y;
+    if (g >= pc.width / 4u || y >= pc.height) return;
+
+    uint base = y * pc.row_stride_bytes + g * 5u;
+    uint lsb  = read_byte(base + 4u);
+    uint cfa_row = (y & 1u) << 1u;
+
+    for (uint i = 0u; i < 4u; ++i) {
+        uint v  = (read_byte(base + i) << 2u) | ((lsb >> (2u * i)) & 3u);
+        uint x  = g * 4u + i;
+        float bl = pc.black_level[cfa_row | (x & 1u)];
+        float range = pc.white_level - bl;
+        float n = range > 0.0 ? clamp((float(v) - bl) / range, 0.0, 1.0) : 0.0;
+        px[y * pc.width + x] = n;
+    }
+}

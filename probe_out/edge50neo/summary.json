@@ -1,0 +1,1272 @@
+{
+  "props": {
+    "ro.product.model": "motorola edge 50 neo",
+    "ro.product.device": "vienna",
+    "ro.product.name": "vienna_g_syses",
+    "ro.board.platform": "mt6878",
+    "ro.soc.manufacturer": "Mediatek",
+    "ro.soc.model": "MT6878",
+    "ro.build.version.release": "16",
+    "ro.build.version.sdk": "36",
+    "ro.build.fingerprint": "motorola/vienna_g_syses/vienna:16/W1UI36H.39-25-11-4/2734cd-58da6:user/release-keys"
+  },
+  "cameras": {
+    "0": {
+      "hal_device": "device@1.1/internal/0",
+      "facing": "back",
+      "hardware_level": "FULL",
+      "capabilities": [
+        "BACKWARD_COMPATIBLE",
+        "MANUAL_SENSOR",
+        "MANUAL_POST_PROCESSING",
+        "READ_SENSOR_SETTINGS",
+        "RAW",
+        "BURST_CAPTURE",
+        "STREAM_USE_CASE",
+        "COLOR_SPACE_PROFILES"
+      ],
+      "supports_raw": true,
+      "cfa": "BGGR",
+      "raw_streams": {
+        "RAW_SENSOR": [
+          "4096x3072"
+        ]
+      },
+      "key_values": {
+        "android.info.supportedHardwareLevel": [
+          "FULL"
+        ],
+        "android.request.availableCapabilities": [
+          "BACKWARD_COMPATIBLE",
+          "MANUAL_SENSOR",
+          "MANUAL_POST_PROCESSING",
+          "READ_SENSOR_SETTINGS",
+          "RAW",
+          "BURST_CAPTURE",
+          "STREAM_USE_CASE",
+          "COLOR_SPACE_PROFILES"
+        ],
+        "android.lens.facing": [
+          "BACK"
+        ],
+        "android.lens.info.availableFocalLengths": [
+          5.55999994
+        ],
+        "android.sensor.info.colorFilterArrangement": [
+          "BGGR"
+        ],
+        "android.sensor.info.whiteLevel": [
+          1023
+        ],
+        "android.sensor.info.pixelArraySize": [
+          4096,
+          3072
+        ],
+        "android.sensor.info.activeArraySize": [
+          0,
+          0,
+          4096,
+          3072
+        ],
+        "android.sensor.info.exposureTimeRange": [
+          100000,
+          400000000
+        ],
+        "android.sensor.info.sensitivityRange": [
+          100,
+          19200
+        ],
+        "android.sensor.blackLevelPattern": [
+          64,
+          64,
+          64,
+          64
+        ],
+        "android.sensor.referenceIlluminant1": [
+          "D65"
+        ],
+        "android.sensor.referenceIlluminant2": [
+          17
+        ],
+        "android.sensor.colorTransform1": [
+          0.6667938232421875,
+          -0.1588897705078125,
+          -0.0857391357421875,
+          -0.573944091796875,
+          1.3897857666015625,
+          0.1430206298828125,
+          -0.13787841796875,
+          0.2651519775390625,
+          0.6036224365234375
+        ],
+        "android.sensor.colorTransform2": [
+          1.531463623046875,
+          -0.4696044921875,
+          -0.215057373046875,
+          -0.476226806640625,
+          1.4453277587890625,
+          0.0066986083984375,
+          -0.071746826171875,
+          0.2387237548828125,
+          0.2329559326171875
+        ],
+        "android.sensor.forwardMatrix1": [
+          0.6731414794921875,
+          0.195037841796875,
+          0.0960235595703125,
+          0.27618408203125,
+          0.818206787109375,
+          -0.0944061279296875,
+          0.0216522216796875,
+          -0.232452392578125,
+          1.0360107421875
+        ],
+        "android.sensor.forwardMatrix2": [
+          0.574493408203125,
+          0.1840057373046875,
+          0.2057037353515625,
+          0.193817138671875,
+          0.7453765869140625,
+          0.060791015625,
+          -0.014495849609375,
+          -0.5286865234375,
+          1.368408203125
+        ],
+        "android.sensor.calibrationTransform1": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.sensor.calibrationTransform2": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.lens.info.minimumFocusDistance": [
+          10.0
+        ]
+      },
+      "vendor_tags": [
+        "com.lenovo.moto.abortcapture.enable",
+        "com.lenovo.moto.control.p3_support",
+        "com.lenovo.moto.control.rawhdr_support",
+        "com.lenovo.moto.control.vstab_available_max_fps",
+        "com.lenovo.moto.control.vstab_available_max_res",
+        "com.lenovo.moto.control.vstab_smarteis_support",
+        "com.lenovo.moto.extension.night_support",
+        "com.lenovo.moto.factory.module_id",
+        "com.lenovo.moto.quadra_cfa.high_resolution_sizes",
+        "com.lenovo.moto.quadra_cfa.is_delay_shutter_event",
+        "com.lenovo.moto.quadra_cfa.is_four_stream_session_supported",
+        "com.lenovo.moto.quadra_cfa.is_qcfa_sensor",
+        "com.lenovo.moto.quadra_cfa.is_remosaic_by_hw",
+        "com.lenovo.moto.quadra_cfa.is_single_session_supported",
+        "com.lenovo.moto.quadra_cfa.max_yuv_input_output_size",
+        "com.lenovo.moto.quadra_cfa.qcfa_dimension",
+        "com.lenovo.moto.sensor.info.arcsoft_dual_calib_blob",
+        "com.lenovo.moto.sensor.info.cameraType",
+        "com.lenovo.moto.sensor.info.exposureTimeRange",
+        "com.lenovo.moto.sensor.info.name",
+        "com.lenovo.moto.sensor.info.pixel_type",
+        "com.lenovo.moto.sensor.info.quad_pixel",
+        "com.lenovo.moto.staticinfo.binning_size",
+        "com.lenovo.moto.staticinfo.eis_vstop_kpi",
+        "com.lenovo.moto.staticinfo.max_preview_size",
+        "com.lenovo.moto.staticinfo.touchaf_for_isp",
+        "com.lenovo.moto.staticinfo.zsl_crop",
+        "com.mediatek.aovservicefeature.availableAovImageSize",
+        "com.mediatek.aovservicefeature.availableAovModes",
+        "com.mediatek.aovservicefeature.availablePipelineConfig",
+        "com.mediatek.bgservicefeature.availableprereleasemodes",
+        "com.mediatek.cameraflex.flexAvailDs",
+        "com.mediatek.cameraflex.flexAvailInFmt",
+        "com.mediatek.cameraflex.flexAvailOutFmt",
+        "com.mediatek.cameraflex.flexAvailUsages",
+        "com.mediatek.camerapreviewcompression.CameraPreviewCompressionModes",
+        "com.mediatek.control.capture.available.zsl.modes",
+        "com.mediatek.control.capture.availablepostviewmodes",
+        "com.mediatek.control.capture.default.zsl.mode",
+        "com.mediatek.control.capture.early.notification.support",
+        "com.mediatek.control.capture.ispMetaSizeForRaw",
+        "com.mediatek.control.capture.ispMetaSizeForYuv",
+        "com.mediatek.cshotfeature.availableCShotModes",
+        "com.mediatek.eisfeature.availableOisModes",
+        "com.mediatek.facefeature.availableforceface3a",
+        "com.mediatek.flashfeature.calibration.available",
+        "com.mediatek.flashfeature.customization.available",
+        "com.mediatek.hdrfeature.availableChdrModes",
+        "com.mediatek.hdrfeature.availableHdrModesPhoto",
+        "com.mediatek.hdrfeature.availableHdrModesVideo",
+        "com.mediatek.hdrfeature.availableVhdrModes",
+        "com.mediatek.hdrfeature.vhdrExpOrder",
+        "com.mediatek.insensorzoomfeature.insensorzoomIsInternalAP",
+        "com.mediatek.insensorzoomfeature.insensorzoomSupportPhysicalIds",
+        "com.mediatek.mdptzfeature.availableMdptzModes",
+        "com.mediatek.mfnrfeature.availableaismodes",
+        "com.mediatek.mfnrfeature.availablemfbmodes",
+        "com.mediatek.multicamfeature.availableMultiCamFeatureSensorManualUpdated",
+        "com.mediatek.multicamfeature.multiCamMtkSat",
+        "com.mediatek.multicamfeature.multiCamZoomOverrideMode",
+        "com.mediatek.nrfeature.available3dnrmodes",
+        "com.mediatek.rgbwfeature.availableModes",
+        "com.mediatek.seamlessfeature.availableCellCropSensorIds",
+        "com.mediatek.seamlessfeature.availableCellFullSensorIds",
+        "com.mediatek.smvrfeature.availableSmvrModes",
+        "com.mediatek.streamingfeature.availableHfpsEISMaxResolutions",
+        "com.mediatek.streamingfeature.availableHfpsMaxResolutions",
+        "com.mediatek.streamingfeature.availableHfpsModes",
+        "com.mediatek.streamingfeature.availableRecordStates",
+        "com.mediatek.streamingfeature.cropOuterLinesEnable",
+        "com.mediatek.streamingfeature.hdr10pEisSupport",
+        "com.mediatek.streamingfeature.hdr10pVssSupport",
+        "com.mediatek.trackingaffeature.trackingafAvailableModes",
+        "com.mediatek.videoainrfeature.videoAinrAvailableModes"
+      ]
+    },
+    "1": {
+      "hal_device": "device@1.1/internal/1",
+      "facing": "front",
+      "hardware_level": "FULL",
+      "capabilities": [
+        "BACKWARD_COMPATIBLE",
+        "MANUAL_SENSOR",
+        "MANUAL_POST_PROCESSING",
+        "READ_SENSOR_SETTINGS",
+        "RAW",
+        "BURST_CAPTURE",
+        "STREAM_USE_CASE",
+        "COLOR_SPACE_PROFILES"
+      ],
+      "supports_raw": true,
+      "cfa": "GRBG",
+      "raw_streams": {
+        "RAW_SENSOR": [
+          "3280x2460"
+        ]
+      },
+      "key_values": {
+        "android.info.supportedHardwareLevel": [
+          "FULL"
+        ],
+        "android.request.availableCapabilities": [
+          "BACKWARD_COMPATIBLE",
+          "MANUAL_SENSOR",
+          "MANUAL_POST_PROCESSING",
+          "READ_SENSOR_SETTINGS",
+          "RAW",
+          "BURST_CAPTURE",
+          "STREAM_USE_CASE",
+          "COLOR_SPACE_PROFILES"
+        ],
+        "android.lens.facing": [
+          "FRONT"
+        ],
+        "android.lens.info.availableFocalLengths": [
+          3.27999997
+        ],
+        "android.sensor.info.colorFilterArrangement": [
+          "GRBG"
+        ],
+        "android.sensor.info.whiteLevel": [
+          1023
+        ],
+        "android.sensor.info.pixelArraySize": [
+          3280,
+          2460
+        ],
+        "android.sensor.info.activeArraySize": [
+          0,
+          0,
+          3280,
+          2460
+        ],
+        "android.sensor.info.exposureTimeRange": [
+          100000,
+          400000000
+        ],
+        "android.sensor.info.sensitivityRange": [
+          100,
+          19200
+        ],
+        "android.sensor.blackLevelPattern": [
+          64,
+          64,
+          64,
+          64
+        ],
+        "android.sensor.referenceIlluminant1": [
+          "D65"
+        ],
+        "android.sensor.referenceIlluminant2": [
+          17
+        ],
+        "android.sensor.colorTransform1": [
+          0.6667938232421875,
+          -0.1588897705078125,
+          -0.0857391357421875,
+          -0.573944091796875,
+          1.3897857666015625,
+          0.1430206298828125,
+          -0.13787841796875,
+          0.2651519775390625,
+          0.6036224365234375
+        ],
+        "android.sensor.colorTransform2": [
+          1.531463623046875,
+          -0.4696044921875,
+          -0.215057373046875,
+          -0.476226806640625,
+          1.4453277587890625,
+          0.0066986083984375,
+          -0.071746826171875,
+          0.2387237548828125,
+          0.2329559326171875
+        ],
+        "android.sensor.forwardMatrix1": [
+          0.6731414794921875,
+          0.195037841796875,
+          0.0960235595703125,
+          0.27618408203125,
+          0.818206787109375,
+          -0.0944061279296875,
+          0.0216522216796875,
+          -0.232452392578125,
+          1.0360107421875
+        ],
+        "android.sensor.forwardMatrix2": [
+          0.574493408203125,
+          0.1840057373046875,
+          0.2057037353515625,
+          0.193817138671875,
+          0.7453765869140625,
+          0.060791015625,
+          -0.014495849609375,
+          -0.5286865234375,
+          1.368408203125
+        ],
+        "android.sensor.calibrationTransform1": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.sensor.calibrationTransform2": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.lens.info.minimumFocusDistance": [
+          0.0
+        ]
+      },
+      "vendor_tags": [
+        "com.lenovo.moto.abortcapture.enable",
+        "com.lenovo.moto.control.p3_support",
+        "com.lenovo.moto.control.rawhdr_support",
+        "com.lenovo.moto.control.video_mirror_support",
+        "com.lenovo.moto.control.vstab_available_max_fps",
+        "com.lenovo.moto.control.vstab_available_max_res",
+        "com.lenovo.moto.control.vstab_smarteis_support",
+        "com.lenovo.moto.extension.night_support",
+        "com.lenovo.moto.factory.module_id",
+        "com.lenovo.moto.quadra_cfa.high_resolution_sizes",
+        "com.lenovo.moto.quadra_cfa.is_qcfa_sensor",
+        "com.lenovo.moto.quadra_cfa.is_remosaic_by_hw",
+        "com.lenovo.moto.quadra_cfa.max_yuv_input_output_size",
+        "com.lenovo.moto.quadra_cfa.qcfa_dimension",
+        "com.lenovo.moto.quadra_cfa.video_config",
+        "com.lenovo.moto.sensor.info.arcsoft_dual_calib_blob",
+        "com.lenovo.moto.sensor.info.cameraType",
+        "com.lenovo.moto.sensor.info.exposureTimeRange",
+        "com.lenovo.moto.sensor.info.name",
+        "com.lenovo.moto.staticinfo.binning_size",
+        "com.lenovo.moto.staticinfo.eis_vstop_kpi",
+        "com.lenovo.moto.staticinfo.max_preview_size",
+        "com.lenovo.moto.staticinfo.touchaf_for_isp",
+        "com.lenovo.moto.staticinfo.zsl_crop",
+        "com.mediatek.aovservicefeature.availableAovImageSize",
+        "com.mediatek.aovservicefeature.availableAovModes",
+        "com.mediatek.aovservicefeature.availablePipelineConfig",
+        "com.mediatek.bgservicefeature.availableprereleasemodes",
+        "com.mediatek.cameraflex.flexAvailDs",
+        "com.mediatek.cameraflex.flexAvailInFmt",
+        "com.mediatek.cameraflex.flexAvailOutFmt",
+        "com.mediatek.cameraflex.flexAvailUsages",
+        "com.mediatek.camerapreviewcompression.CameraPreviewCompressionModes",
+        "com.mediatek.control.capture.available.zsl.modes",
+        "com.mediatek.control.capture.availablepostviewmodes",
+        "com.mediatek.control.capture.default.zsl.mode",
+        "com.mediatek.control.capture.early.notification.support",
+        "com.mediatek.control.capture.ispMetaSizeForRaw",
+        "com.mediatek.control.capture.ispMetaSizeForYuv",
+        "com.mediatek.cshotfeature.availableCShotModes",
+        "com.mediatek.facefeature.availableforceface3a",
+        "com.mediatek.flashfeature.calibration.available",
+        "com.mediatek.flashfeature.customization.available",
+        "com.mediatek.hdrfeature.availableChdrModes",
+        "com.mediatek.hdrfeature.availableHdrModesPhoto",
+        "com.mediatek.hdrfeature.availableHdrModesVideo",
+        "com.mediatek.hdrfeature.availableVhdrModes",
+        "com.mediatek.hdrfeature.vhdrExpOrder",
+        "com.mediatek.insensorzoomfeature.insensorzoomIsInternalAP",
+        "com.mediatek.mdptzfeature.availableMdptzModes",
+        "com.mediatek.mfnrfeature.availableaismodes",
+        "com.mediatek.mfnrfeature.availablemfbmodes",
+        "com.mediatek.multicamfeature.availableMultiCamFeatureSensorManualUpdated",
+        "com.mediatek.multicamfeature.multiCamMtkSat",
+        "com.mediatek.multicamfeature.multiCamZoomOverrideMode",
+        "com.mediatek.nrfeature.available3dnrmodes",
+        "com.mediatek.rgbwfeature.availableModes",
+        "com.mediatek.smvrfeature.availableSmvrModes",
+        "com.mediatek.streamingfeature.availableHfpsEISMaxResolutions",
+        "com.mediatek.streamingfeature.availableHfpsMaxResolutions",
+        "com.mediatek.streamingfeature.availableHfpsModes",
+        "com.mediatek.streamingfeature.availableRecordStates",
+        "com.mediatek.streamingfeature.cropOuterLinesEnable",
+        "com.mediatek.streamingfeature.hdr10pEisSupport",
+        "com.mediatek.streamingfeature.hdr10pVssSupport",
+        "com.mediatek.trackingaffeature.trackingafAvailableModes",
+        "com.mediatek.videoainrfeature.videoAinrAvailableModes"
+      ]
+    },
+    "2": {
+      "hal_device": "device@1.1/internal/2",
+      "facing": "back",
+      "hardware_level": "FULL",
+      "capabilities": [
+        "BACKWARD_COMPATIBLE",
+        "MANUAL_SENSOR",
+        "MANUAL_POST_PROCESSING",
+        "READ_SENSOR_SETTINGS",
+        "RAW",
+        "BURST_CAPTURE",
+        "STREAM_USE_CASE",
+        "COLOR_SPACE_PROFILES"
+      ],
+      "supports_raw": true,
+      "cfa": "GBRG",
+      "raw_streams": {
+        "RAW_SENSOR": [
+          "4160x3120"
+        ]
+      },
+      "key_values": {
+        "android.info.supportedHardwareLevel": [
+          "FULL"
+        ],
+        "android.request.availableCapabilities": [
+          "BACKWARD_COMPATIBLE",
+          "MANUAL_SENSOR",
+          "MANUAL_POST_PROCESSING",
+          "READ_SENSOR_SETTINGS",
+          "RAW",
+          "BURST_CAPTURE",
+          "STREAM_USE_CASE",
+          "COLOR_SPACE_PROFILES"
+        ],
+        "android.lens.facing": [
+          "BACK"
+        ],
+        "android.lens.info.availableFocalLengths": [
+          2.13000011
+        ],
+        "android.sensor.info.colorFilterArrangement": [
+          "GBRG"
+        ],
+        "android.sensor.info.whiteLevel": [
+          1023
+        ],
+        "android.sensor.info.pixelArraySize": [
+          4160,
+          3120
+        ],
+        "android.sensor.info.activeArraySize": [
+          0,
+          0,
+          4160,
+          3120
+        ],
+        "android.sensor.info.exposureTimeRange": [
+          100000,
+          400000000
+        ],
+        "android.sensor.info.sensitivityRange": [
+          100,
+          8000
+        ],
+        "android.sensor.blackLevelPattern": [
+          64,
+          64,
+          64,
+          64
+        ],
+        "android.sensor.referenceIlluminant1": [
+          "D65"
+        ],
+        "android.sensor.referenceIlluminant2": [
+          17
+        ],
+        "android.sensor.colorTransform1": [
+          0.6667938232421875,
+          -0.1588897705078125,
+          -0.0857391357421875,
+          -0.573944091796875,
+          1.3897857666015625,
+          0.1430206298828125,
+          -0.13787841796875,
+          0.2651519775390625,
+          0.6036224365234375
+        ],
+        "android.sensor.colorTransform2": [
+          1.531463623046875,
+          -0.4696044921875,
+          -0.215057373046875,
+          -0.476226806640625,
+          1.4453277587890625,
+          0.0066986083984375,
+          -0.071746826171875,
+          0.2387237548828125,
+          0.2329559326171875
+        ],
+        "android.sensor.forwardMatrix1": [
+          0.6731414794921875,
+          0.195037841796875,
+          0.0960235595703125,
+          0.27618408203125,
+          0.818206787109375,
+          -0.0944061279296875,
+          0.0216522216796875,
+          -0.232452392578125,
+          1.0360107421875
+        ],
+        "android.sensor.forwardMatrix2": [
+          0.574493408203125,
+          0.1840057373046875,
+          0.2057037353515625,
+          0.193817138671875,
+          0.7453765869140625,
+          0.060791015625,
+          -0.014495849609375,
+          -0.5286865234375,
+          1.368408203125
+        ],
+        "android.sensor.calibrationTransform1": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.sensor.calibrationTransform2": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.lens.info.minimumFocusDistance": [
+          40.0
+        ]
+      },
+      "vendor_tags": [
+        "com.lenovo.moto.abortcapture.enable",
+        "com.lenovo.moto.control.p3_support",
+        "com.lenovo.moto.control.rawhdr_support",
+        "com.lenovo.moto.control.vstab_available_max_fps",
+        "com.lenovo.moto.control.vstab_available_max_res",
+        "com.lenovo.moto.control.vstab_ihc_res",
+        "com.lenovo.moto.control.vstab_ihc_support",
+        "com.lenovo.moto.control.vstab_smarteis_support",
+        "com.lenovo.moto.dc.algorithm_name",
+        "com.lenovo.moto.factory.module_id",
+        "com.lenovo.moto.sensor.info.arcsoft_distortion_correction",
+        "com.lenovo.moto.sensor.info.arcsoft_dual_calib_blob",
+        "com.lenovo.moto.sensor.info.cameraType",
+        "com.lenovo.moto.sensor.info.exposureTimeRange",
+        "com.lenovo.moto.sensor.info.name",
+        "com.lenovo.moto.staticinfo.eis_vstop_kpi",
+        "com.lenovo.moto.staticinfo.max_preview_size",
+        "com.lenovo.moto.staticinfo.touchaf_for_isp",
+        "com.lenovo.moto.staticinfo.zsl_crop",
+        "com.mediatek.aovservicefeature.availableAovImageSize",
+        "com.mediatek.aovservicefeature.availableAovModes",
+        "com.mediatek.aovservicefeature.availablePipelineConfig",
+        "com.mediatek.bgservicefeature.availableprereleasemodes",
+        "com.mediatek.cameraflex.flexAvailDs",
+        "com.mediatek.cameraflex.flexAvailInFmt",
+        "com.mediatek.cameraflex.flexAvailOutFmt",
+        "com.mediatek.cameraflex.flexAvailUsages",
+        "com.mediatek.camerapreviewcompression.CameraPreviewCompressionModes",
+        "com.mediatek.control.capture.available.zsl.modes",
+        "com.mediatek.control.capture.availablepostviewmodes",
+        "com.mediatek.control.capture.default.zsl.mode",
+        "com.mediatek.control.capture.early.notification.support",
+        "com.mediatek.control.capture.ispMetaSizeForRaw",
+        "com.mediatek.control.capture.ispMetaSizeForYuv",
+        "com.mediatek.cshotfeature.availableCShotModes",
+        "com.mediatek.facefeature.availableforceface3a",
+        "com.mediatek.flashfeature.calibration.available",
+        "com.mediatek.flashfeature.customization.available",
+        "com.mediatek.hdrfeature.availableChdrModes",
+        "com.mediatek.hdrfeature.availableHdrModesPhoto",
+        "com.mediatek.hdrfeature.availableHdrModesVideo",
+        "com.mediatek.hdrfeature.availableVhdrModes",
+        "com.mediatek.hdrfeature.vhdrExpOrder",
+        "com.mediatek.insensorzoomfeature.insensorzoomIsInternalAP",
+        "com.mediatek.mdptzfeature.availableMdptzModes",
+        "com.mediatek.mfnrfeature.availableaismodes",
+        "com.mediatek.mfnrfeature.availablemfbmodes",
+        "com.mediatek.multicamfeature.availableMultiCamFeatureSensorManualUpdated",
+        "com.mediatek.multicamfeature.multiCamMtkSat",
+        "com.mediatek.multicamfeature.multiCamZoomOverrideMode",
+        "com.mediatek.nrfeature.available3dnrmodes",
+        "com.mediatek.rgbwfeature.availableModes",
+        "com.mediatek.streamingfeature.availableRecordStates",
+        "com.mediatek.streamingfeature.cropOuterLinesEnable",
+        "com.mediatek.streamingfeature.hdr10pEisSupport",
+        "com.mediatek.streamingfeature.hdr10pVssSupport",
+        "com.mediatek.trackingaffeature.trackingafAvailableModes",
+        "com.mediatek.videoainrfeature.videoAinrAvailableModes"
+      ]
+    },
+    "3": {
+      "hal_device": "device@1.1/internal/3",
+      "facing": "back",
+      "hardware_level": "FULL",
+      "capabilities": [
+        "BACKWARD_COMPATIBLE",
+        "MANUAL_SENSOR",
+        "MANUAL_POST_PROCESSING",
+        "READ_SENSOR_SETTINGS",
+        "RAW",
+        "BURST_CAPTURE",
+        "STREAM_USE_CASE",
+        "COLOR_SPACE_PROFILES"
+      ],
+      "supports_raw": true,
+      "cfa": "GRBG",
+      "raw_streams": {
+        "RAW_SENSOR": [
+          "3648x2736"
+        ]
+      },
+      "key_values": {
+        "android.info.supportedHardwareLevel": [
+          "FULL"
+        ],
+        "android.request.availableCapabilities": [
+          "BACKWARD_COMPATIBLE",
+          "MANUAL_SENSOR",
+          "MANUAL_POST_PROCESSING",
+          "READ_SENSOR_SETTINGS",
+          "RAW",
+          "BURST_CAPTURE",
+          "STREAM_USE_CASE",
+          "COLOR_SPACE_PROFILES"
+        ],
+        "android.lens.facing": [
+          "BACK"
+        ],
+        "android.lens.info.availableFocalLengths": [
+          7.05999994
+        ],
+        "android.sensor.info.colorFilterArrangement": [
+          "GRBG"
+        ],
+        "android.sensor.info.whiteLevel": [
+          1023
+        ],
+        "android.sensor.info.pixelArraySize": [
+          3648,
+          2736
+        ],
+        "android.sensor.info.activeArraySize": [
+          0,
+          0,
+          3648,
+          2736
+        ],
+        "android.sensor.info.exposureTimeRange": [
+          100000,
+          400000000
+        ],
+        "android.sensor.info.sensitivityRange": [
+          100,
+          16000
+        ],
+        "android.sensor.blackLevelPattern": [
+          64,
+          64,
+          64,
+          64
+        ],
+        "android.sensor.referenceIlluminant1": [
+          "D65"
+        ],
+        "android.sensor.referenceIlluminant2": [
+          17
+        ],
+        "android.sensor.colorTransform1": [
+          0.6667938232421875,
+          -0.1588897705078125,
+          -0.0857391357421875,
+          -0.573944091796875,
+          1.3897857666015625,
+          0.1430206298828125,
+          -0.13787841796875,
+          0.2651519775390625,
+          0.6036224365234375
+        ],
+        "android.sensor.colorTransform2": [
+          1.531463623046875,
+          -0.4696044921875,
+          -0.215057373046875,
+          -0.476226806640625,
+          1.4453277587890625,
+          0.0066986083984375,
+          -0.071746826171875,
+          0.2387237548828125,
+          0.2329559326171875
+        ],
+        "android.sensor.forwardMatrix1": [
+          0.6731414794921875,
+          0.195037841796875,
+          0.0960235595703125,
+          0.27618408203125,
+          0.818206787109375,
+          -0.0944061279296875,
+          0.0216522216796875,
+          -0.232452392578125,
+          1.0360107421875
+        ],
+        "android.sensor.forwardMatrix2": [
+          0.574493408203125,
+          0.1840057373046875,
+          0.2057037353515625,
+          0.193817138671875,
+          0.7453765869140625,
+          0.060791015625,
+          -0.014495849609375,
+          -0.5286865234375,
+          1.368408203125
+        ],
+        "android.sensor.calibrationTransform1": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.sensor.calibrationTransform2": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.lens.info.minimumFocusDistance": [
+          5.0
+        ]
+      },
+      "vendor_tags": [
+        "com.lenovo.moto.abortcapture.enable",
+        "com.lenovo.moto.control.p3_support",
+        "com.lenovo.moto.control.rawhdr_support",
+        "com.lenovo.moto.control.vstab_available_max_fps",
+        "com.lenovo.moto.control.vstab_available_max_res",
+        "com.lenovo.moto.control.vstab_smarteis_support",
+        "com.lenovo.moto.factory.module_id",
+        "com.lenovo.moto.quadra_cfa.video_config",
+        "com.lenovo.moto.sensor.info.arcsoft_dual_calib_blob",
+        "com.lenovo.moto.sensor.info.cameraType",
+        "com.lenovo.moto.sensor.info.exposureTimeRange",
+        "com.lenovo.moto.sensor.info.name",
+        "com.lenovo.moto.staticinfo.eis_vstop_kpi",
+        "com.lenovo.moto.staticinfo.max_preview_size",
+        "com.lenovo.moto.staticinfo.touchaf_for_isp",
+        "com.lenovo.moto.staticinfo.zsl_crop",
+        "com.mediatek.aovservicefeature.availableAovImageSize",
+        "com.mediatek.aovservicefeature.availableAovModes",
+        "com.mediatek.aovservicefeature.availablePipelineConfig",
+        "com.mediatek.bgservicefeature.availableprereleasemodes",
+        "com.mediatek.cameraflex.flexAvailDs",
+        "com.mediatek.cameraflex.flexAvailInFmt",
+        "com.mediatek.cameraflex.flexAvailOutFmt",
+        "com.mediatek.cameraflex.flexAvailUsages",
+        "com.mediatek.camerapreviewcompression.CameraPreviewCompressionModes",
+        "com.mediatek.control.capture.available.zsl.modes",
+        "com.mediatek.control.capture.availablepostviewmodes",
+        "com.mediatek.control.capture.default.zsl.mode",
+        "com.mediatek.control.capture.early.notification.support",
+        "com.mediatek.control.capture.ispMetaSizeForRaw",
+        "com.mediatek.control.capture.ispMetaSizeForYuv",
+        "com.mediatek.cshotfeature.availableCShotModes",
+        "com.mediatek.eisfeature.availableOisModes",
+        "com.mediatek.facefeature.availableforceface3a",
+        "com.mediatek.flashfeature.calibration.available",
+        "com.mediatek.flashfeature.customization.available",
+        "com.mediatek.hdrfeature.availableChdrModes",
+        "com.mediatek.hdrfeature.availableHdrModesPhoto",
+        "com.mediatek.hdrfeature.availableHdrModesVideo",
+        "com.mediatek.hdrfeature.availableVhdrModes",
+        "com.mediatek.hdrfeature.vhdrExpOrder",
+        "com.mediatek.insensorzoomfeature.insensorzoomIsInternalAP",
+        "com.mediatek.mdptzfeature.availableMdptzModes",
+        "com.mediatek.mfnrfeature.availableaismodes",
+        "com.mediatek.mfnrfeature.availablemfbmodes",
+        "com.mediatek.multicamfeature.availableMultiCamFeatureSensorManualUpdated",
+        "com.mediatek.multicamfeature.multiCamMtkSat",
+        "com.mediatek.multicamfeature.multiCamZoomOverrideMode",
+        "com.mediatek.nrfeature.available3dnrmodes",
+        "com.mediatek.rgbwfeature.availableModes",
+        "com.mediatek.streamingfeature.availableRecordStates",
+        "com.mediatek.streamingfeature.cropOuterLinesEnable",
+        "com.mediatek.streamingfeature.hdr10pEisSupport",
+        "com.mediatek.streamingfeature.hdr10pVssSupport",
+        "com.mediatek.trackingaffeature.trackingafAvailableModes",
+        "com.mediatek.videoainrfeature.videoAinrAvailableModes"
+      ]
+    },
+    "4": {
+      "hal_device": "device@1.1/internal/4",
+      "facing": "front",
+      "hardware_level": "LIMITED",
+      "capabilities": [
+        "SECURE_IMAGE_DATA"
+      ],
+      "supports_raw": false,
+      "cfa": "GRBG",
+      "raw_streams": {},
+      "key_values": {
+        "android.info.supportedHardwareLevel": [
+          "LIMITED"
+        ],
+        "android.request.availableCapabilities": [
+          "SECURE_IMAGE_DATA"
+        ],
+        "android.lens.facing": [
+          "FRONT"
+        ],
+        "android.lens.info.availableFocalLengths": [
+          3.27999997
+        ],
+        "android.sensor.info.colorFilterArrangement": [
+          "GRBG"
+        ],
+        "android.sensor.info.whiteLevel": [
+          1023
+        ],
+        "android.sensor.info.pixelArraySize": [
+          3280,
+          2460
+        ],
+        "android.sensor.info.activeArraySize": [
+          0,
+          0,
+          3280,
+          2460
+        ],
+        "android.sensor.info.exposureTimeRange": [
+          100000,
+          400000000
+        ],
+        "android.sensor.info.sensitivityRange": [
+          100,
+          6400
+        ],
+        "android.sensor.blackLevelPattern": [
+          64,
+          64,
+          64,
+          64
+        ],
+        "android.sensor.referenceIlluminant1": [
+          "D65"
+        ],
+        "android.sensor.referenceIlluminant2": [
+          17
+        ],
+        "android.sensor.colorTransform1": [
+          0.6667938232421875,
+          -0.1588897705078125,
+          -0.0857391357421875,
+          -0.573944091796875,
+          1.3897857666015625,
+          0.1430206298828125,
+          -0.13787841796875,
+          0.2651519775390625,
+          0.6036224365234375
+        ],
+        "android.sensor.colorTransform2": [
+          1.531463623046875,
+          -0.4696044921875,
+          -0.215057373046875,
+          -0.476226806640625,
+          1.4453277587890625,
+          0.0066986083984375,
+          -0.071746826171875,
+          0.2387237548828125,
+          0.2329559326171875
+        ],
+        "android.sensor.forwardMatrix1": [
+          0.6731414794921875,
+          0.195037841796875,
+          0.0960235595703125,
+          0.27618408203125,
+          0.818206787109375,
+          -0.0944061279296875,
+          0.0216522216796875,
+          -0.232452392578125,
+          1.0360107421875
+        ],
+        "android.sensor.forwardMatrix2": [
+          0.574493408203125,
+          0.1840057373046875,
+          0.2057037353515625,
+          0.193817138671875,
+          0.7453765869140625,
+          0.060791015625,
+          -0.014495849609375,
+          -0.5286865234375,
+          1.368408203125
+        ],
+        "android.sensor.calibrationTransform1": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.sensor.calibrationTransform2": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.lens.info.minimumFocusDistance": [
+          0.0
+        ]
+      },
+      "vendor_tags": [
+        "com.lenovo.moto.abortcapture.enable",
+        "com.lenovo.moto.control.p3_support",
+        "com.lenovo.moto.control.secure_camera_idx",
+        "com.lenovo.moto.factory.module_id",
+        "com.lenovo.moto.sensor.info.arcsoft_dual_calib_blob",
+        "com.lenovo.moto.staticinfo.eis_vstop_kpi",
+        "com.lenovo.moto.staticinfo.touchaf_for_isp",
+        "com.lenovo.moto.staticinfo.zsl_crop",
+        "com.mediatek.aovservicefeature.availableAovImageSize",
+        "com.mediatek.aovservicefeature.availableAovModes",
+        "com.mediatek.aovservicefeature.availablePipelineConfig",
+        "com.mediatek.bgservicefeature.availableprereleasemodes",
+        "com.mediatek.cameraflex.flexAvailDs",
+        "com.mediatek.cameraflex.flexAvailInFmt",
+        "com.mediatek.cameraflex.flexAvailOutFmt",
+        "com.mediatek.cameraflex.flexAvailUsages",
+        "com.mediatek.camerapreviewcompression.CameraPreviewCompressionModes",
+        "com.mediatek.control.capture.available.zsl.modes",
+        "com.mediatek.control.capture.availablepostviewmodes",
+        "com.mediatek.control.capture.default.zsl.mode",
+        "com.mediatek.control.capture.early.notification.support",
+        "com.mediatek.control.capture.ispMetaSizeForRaw",
+        "com.mediatek.control.capture.ispMetaSizeForYuv",
+        "com.mediatek.cshotfeature.availableCShotModes",
+        "com.mediatek.facefeature.availableforceface3a",
+        "com.mediatek.flashfeature.calibration.available",
+        "com.mediatek.flashfeature.customization.available",
+        "com.mediatek.hdrfeature.availableChdrModes",
+        "com.mediatek.hdrfeature.availableHdrModesPhoto",
+        "com.mediatek.hdrfeature.availableHdrModesVideo",
+        "com.mediatek.hdrfeature.availableVhdrModes",
+        "com.mediatek.hdrfeature.vhdrExpOrder",
+        "com.mediatek.insensorzoomfeature.insensorzoomIsInternalAP",
+        "com.mediatek.mdptzfeature.availableMdptzModes",
+        "com.mediatek.mfnrfeature.availableaismodes",
+        "com.mediatek.mfnrfeature.availablemfbmodes",
+        "com.mediatek.multicamfeature.multiCamMtkSat",
+        "com.mediatek.multicamfeature.multiCamZoomOverrideMode",
+        "com.mediatek.nrfeature.available3dnrmodes",
+        "com.mediatek.rgbwfeature.availableModes",
+        "com.mediatek.streamingfeature.availableRecordStates",
+        "com.mediatek.streamingfeature.cropOuterLinesEnable",
+        "com.mediatek.streamingfeature.hdr10pEisSupport",
+        "com.mediatek.streamingfeature.hdr10pVssSupport",
+        "com.mediatek.trackingaffeature.trackingafAvailableModes",
+        "com.mediatek.videoainrfeature.videoAinrAvailableModes"
+      ]
+    },
+    "5": {
+      "hal_device": "device@1.1/internal/5",
+      "facing": "back",
+      "hardware_level": "FULL",
+      "capabilities": [
+        "BACKWARD_COMPATIBLE",
+        "MANUAL_SENSOR",
+        "MANUAL_POST_PROCESSING",
+        "READ_SENSOR_SETTINGS",
+        "RAW",
+        "BURST_CAPTURE",
+        "LOGICAL_MULTI_CAMERA",
+        "STREAM_USE_CASE",
+        "COLOR_SPACE_PROFILES"
+      ],
+      "supports_raw": true,
+      "cfa": "BGGR",
+      "raw_streams": {
+        "RAW_SENSOR": [
+          "4096x3072"
+        ]
+      },
+      "key_values": {
+        "android.info.supportedHardwareLevel": [
+          "FULL"
+        ],
+        "android.request.availableCapabilities": [
+          "BACKWARD_COMPATIBLE",
+          "MANUAL_SENSOR",
+          "MANUAL_POST_PROCESSING",
+          "READ_SENSOR_SETTINGS",
+          "RAW",
+          "BURST_CAPTURE",
+          "LOGICAL_MULTI_CAMERA",
+          "STREAM_USE_CASE",
+          "COLOR_SPACE_PROFILES"
+        ],
+        "android.lens.facing": [
+          "BACK"
+        ],
+        "android.lens.info.availableFocalLengths": [
+          5.55999994
+        ],
+        "android.sensor.info.colorFilterArrangement": [
+          "BGGR"
+        ],
+        "android.sensor.info.whiteLevel": [
+          1023
+        ],
+        "android.sensor.info.pixelArraySize": [
+          4096,
+          3072
+        ],
+        "android.sensor.info.activeArraySize": [
+          0,
+          0,
+          4096,
+          3072
+        ],
+        "android.sensor.info.exposureTimeRange": [
+          100000,
+          400000000
+        ],
+        "android.sensor.info.sensitivityRange": [
+          100,
+          6400
+        ],
+        "android.sensor.blackLevelPattern": [
+          64,
+          64,
+          64,
+          64
+        ],
+        "android.sensor.referenceIlluminant1": [
+          "D65"
+        ],
+        "android.sensor.referenceIlluminant2": [
+          17
+        ],
+        "android.sensor.colorTransform1": [
+          0.6667938232421875,
+          -0.1588897705078125,
+          -0.0857391357421875,
+          -0.573944091796875,
+          1.3897857666015625,
+          0.1430206298828125,
+          -0.13787841796875,
+          0.2651519775390625,
+          0.6036224365234375
+        ],
+        "android.sensor.colorTransform2": [
+          1.531463623046875,
+          -0.4696044921875,
+          -0.215057373046875,
+          -0.476226806640625,
+          1.4453277587890625,
+          0.0066986083984375,
+          -0.071746826171875,
+          0.2387237548828125,
+          0.2329559326171875
+        ],
+        "android.sensor.forwardMatrix1": [
+          0.6731414794921875,
+          0.195037841796875,
+          0.0960235595703125,
+          0.27618408203125,
+          0.818206787109375,
+          -0.0944061279296875,
+          0.0216522216796875,
+          -0.232452392578125,
+          1.0360107421875
+        ],
+        "android.sensor.forwardMatrix2": [
+          0.574493408203125,
+          0.1840057373046875,
+          0.2057037353515625,
+          0.193817138671875,
+          0.7453765869140625,
+          0.060791015625,
+          -0.014495849609375,
+          -0.5286865234375,
+          1.368408203125
+        ],
+        "android.sensor.calibrationTransform1": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.sensor.calibrationTransform2": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "android.logicalMultiCamera.physicalIds": [
+          0,
+          2,
+          3
+        ],
+        "android.lens.info.minimumFocusDistance": [
+          10.0
+        ]
+      },
+      "vendor_tags": [
+        "com.lenovo.moto.abortcapture.enable",
+        "com.lenovo.moto.control.p3_support",
+        "com.lenovo.moto.control.rawhdr_support",
+        "com.lenovo.moto.control.vstab_available_max_fps",
+        "com.lenovo.moto.control.vstab_available_max_res",
+        "com.lenovo.moto.control.vstab_pzs_support",
+        "com.lenovo.moto.control.vstab_pzs_support_v2",
+        "com.lenovo.moto.control.vstab_smarteis_support",
+        "com.lenovo.moto.dc.algorithm_name",
+        "com.lenovo.moto.extension.support_mfnr_night",
+        "com.lenovo.moto.factory.module_id",
+        "com.lenovo.moto.sensor.info.arcsoft_dual_calib_blob",
+        "com.lenovo.moto.sensor.info.cameraType",
+        "com.lenovo.moto.sensor.info.exposureTimeRange",
+        "com.lenovo.moto.sensor.info.name",
+        "com.lenovo.moto.staticinfo.eis_vstop_kpi",
+        "com.lenovo.moto.staticinfo.max_preview_size",
+        "com.lenovo.moto.staticinfo.superZoomLevel",
+        "com.lenovo.moto.staticinfo.touchaf_for_isp",
+        "com.lenovo.moto.staticinfo.zsl_crop",
+        "com.mediatek.aovservicefeature.availableAovImageSize",
+        "com.mediatek.aovservicefeature.availableAovModes",
+        "com.mediatek.aovservicefeature.availablePipelineConfig",
+        "com.mediatek.bgservicefeature.availableprereleasemodes",
+        "com.mediatek.cameraflex.flexAvailDs",
+        "com.mediatek.cameraflex.flexAvailInFmt",
+        "com.mediatek.cameraflex.flexAvailOutFmt",
+        "com.mediatek.cameraflex.flexAvailUsages",
+        "com.mediatek.camerapreviewcompression.CameraPreviewCompressionModes",
+        "com.mediatek.control.capture.available.zsl.modes",
+        "com.mediatek.control.capture.availablepostviewmodes",
+        "com.mediatek.control.capture.default.zsl.mode",
+        "com.mediatek.control.capture.early.notification.support",
+        "com.mediatek.control.capture.ispMetaSizeForRaw",
+        "com.mediatek.control.capture.ispMetaSizeForYuv",
+        "com.mediatek.cshotfeature.availableCShotModes",
+        "com.mediatek.facefeature.availableforceface3a",
+        "com.mediatek.flashfeature.calibration.available",
+        "com.mediatek.flashfeature.customization.available",
+        "com.mediatek.hdrfeature.availableChdrModes",
+        "com.mediatek.hdrfeature.availableHdrModesPhoto",
+        "com.mediatek.hdrfeature.availableHdrModesVideo",
+        "com.mediatek.hdrfeature.availableVhdrModes",
+        "com.mediatek.hdrfeature.vhdrExpOrder",
+        "com.mediatek.insensorzoomfeature.insensorzoomIsInternalAP",
+        "com.mediatek.insensorzoomfeature.insensorzoomSupportPhysicalIds",
+        "com.mediatek.mdptzfeature.availableMdptzModes",
+        "com.mediatek.mfnrfeature.availableaismodes",
+        "com.mediatek.mfnrfeature.availablemfbmodes",
+        "com.mediatek.multicamfeature.availableMultiCamFeatureMode",
+        "com.mediatek.multicamfeature.multiCamMtkSat",
+        "com.mediatek.multicamfeature.multiCamZoomOverrideMode",
+        "com.mediatek.multicamfeature.multiCamZoomSteps",
+        "com.mediatek.nrfeature.available3dnrmodes",
+        "com.mediatek.rgbwfeature.availableModes",
+        "com.mediatek.seamlessfeature.availableCellCropSensorIds",
+        "com.mediatek.seamlessfeature.availableCellFullSensorIds",
+        "com.mediatek.smvrfeature.availableSmvrModes",
+        "com.mediatek.streamingfeature.availableHfpsEISMaxResolutions",
+        "com.mediatek.streamingfeature.availableHfpsMaxResolutions",
+        "com.mediatek.streamingfeature.availableHfpsModes",
+        "com.mediatek.streamingfeature.availableRecordStates",
+        "com.mediatek.streamingfeature.cropOuterLinesEnable",
+        "com.mediatek.streamingfeature.hdr10pEisSupport",
+        "com.mediatek.streamingfeature.hdr10pVssSupport",
+        "com.mediatek.trackingaffeature.trackingafAvailableModes",
+        "com.mediatek.videoainrfeature.videoAinrAvailableModes"
+      ]
+    }
+  }
+}

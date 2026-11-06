@@ -208,17 +208,90 @@ class GXVcamViewModel : ViewModel() {
             }
 
             is GXVcamEvent.OnTapToFocus -> {
-                _uiState.update { it.copy(isAeAfLocked = false, tapFocusEvOffset = 0f) }
-                controller?.triggerTapToFocus(event.x, event.y, isLocked = false)
+                val isAeLocked = _uiState.value.isAeLocked
+                val isAfLocked = _uiState.value.isAfLocked
+                if (!isAeLocked) {
+                    _uiState.update { it.copy(tapFocusEvOffset = 0f) }
+                }
+                controller?.triggerTapToFocus(event.x, event.y, isAeLocked = isAeLocked, isAfLocked = isAfLocked)
+            }
+
+            is GXVcamEvent.SetAeLock -> {
+                val newLocked = event.locked
+                _uiState.update {
+                    it.copy(
+                        isAeLocked = newLocked,
+                        sonyAeMode = if (newLocked) SonyAeMode.AE_L else if (it.sonyAeMode == SonyAeMode.AE_L) SonyAeMode.AE_AUTO else it.sonyAeMode
+                    )
+                }
+                controller?.setAeLock(newLocked)
+                if (!newLocked && !_uiState.value.isAfLocked) {
+                    controller?.unlockAe()
+                }
+            }
+
+            is GXVcamEvent.SetAfLock -> {
+                val newLocked = event.locked
+                _uiState.update {
+                    it.copy(
+                        isAfLocked = newLocked,
+                        sonyAfMode = if (newLocked) SonyAfMode.AF_L else if (it.sonyAfMode == SonyAfMode.AF_L) SonyAfMode.AF_C else it.sonyAfMode
+                    )
+                }
+                if (newLocked) {
+                    controller?.triggerTapToFocus(event.x, event.y, isAeLocked = _uiState.value.isAeLocked, isAfLocked = false)
+                    controller?.setAfMode(SonyAfMode.AF_L, locked = true)
+                } else {
+                    controller?.setAfMode(_uiState.value.sonyAfMode, locked = false)
+                    controller?.unlockAf()
+                }
             }
 
             is GXVcamEvent.SetAeAfLock -> {
-                _uiState.update { it.copy(isAeAfLocked = event.locked) }
-                if (event.locked) {
-                    controller?.triggerTapToFocus(event.x, event.y, isLocked = true)
+                val newLocked = event.locked
+                _uiState.update {
+                    it.copy(
+                        isAeLocked = newLocked,
+                        isAfLocked = newLocked,
+                        sonyAeMode = if (newLocked) SonyAeMode.AE_L else SonyAeMode.AE_AUTO,
+                        sonyAfMode = if (newLocked) SonyAfMode.AF_L else SonyAfMode.AF_C
+                    )
+                }
+                if (newLocked) {
+                    controller?.triggerTapToFocus(event.x, event.y, isAeLocked = false, isAfLocked = false)
+                    controller?.setAeLock(true)
+                    controller?.setAfMode(SonyAfMode.AF_L, locked = true)
                 } else {
                     controller?.unlockAeAf()
+                    controller?.setAfMode(_uiState.value.sonyAfMode, locked = false)
+                    controller?.setAeMode(_uiState.value.sonyAeMode, locked = false)
                 }
+            }
+
+            is GXVcamEvent.SetSonyAfMode -> {
+                val isLockMode = event.mode == SonyAfMode.AF_L
+                val isMfMode = event.mode == SonyAfMode.MF
+                _uiState.update {
+                    it.copy(
+                        sonyAfMode = event.mode,
+                        isAfLocked = isLockMode,
+                        proSettings = if (isMfMode) it.proSettings.copy(isManualFocus = true) else it.proSettings
+                    )
+                }
+                controller?.setAfMode(event.mode, locked = isLockMode)
+            }
+
+            is GXVcamEvent.SetSonyAeMode -> {
+                val isLockMode = event.mode == SonyAeMode.AE_L
+                val isManualMode = event.mode == SonyAeMode.AE_M
+                _uiState.update {
+                    it.copy(
+                        sonyAeMode = event.mode,
+                        isAeLocked = isLockMode,
+                        proSettings = if (isManualMode) it.proSettings.copy(isManualIso = true, isManualShutter = true) else it.proSettings
+                    )
+                }
+                controller?.setAeMode(event.mode, locked = isLockMode)
             }
 
             is GXVcamEvent.SetTapFocusEv -> {

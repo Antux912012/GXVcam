@@ -22,7 +22,8 @@ Pre-built APKs are available under GitHub Releases:
 | Area | State | Highlights |
 | :--- | :--- | :--- |
 | **Multi-Camera & Aux Sensors** | ✅ Verified on Edge 50 Neo | Bypasses `vendor.camera.aux.packagelist` to expose & bind Camera 0 (Main 50MP Sony IMX896), Camera 2 (13MP GalaxyCore GC13A2 Ultra-Wide 0.6x), Camera 3 (10MP Samsung S5K3K1 Telephoto 3x), and Camera 5 (Logical multi-camera) |
-| **Focus & Exposure (AE/AF Lock)** | ✅ Pro Camera Controls | Sony Alpha corner bracket reticle, interactive vertical EV drag slider (-4.0 to +4.0 EV), and persistent AE/AF Lock (`[AE/AF LOCKED]`) with golden amber indicator |
+| **Focus & Exposure (AE/AF Split Lock)** | ✅ Sony Alpha Separate AE & AF | Dedicated top-bar buttons for **AE** and **AF** reflecting active Sony Alpha shooting modes (`AF-C`, `AF-S`, `AF-Auto`, `AF-L`, `AF-M` / `AE-Multi`, `AE-Center`, `AE-Spot`, `AE-L`, `AE-M`); independent `[AE-L]` and `[AF-L]` viewfinder pills to lock/unlock exposure or focus separately |
+| **Niagara Exposure Bar** | ✅ LRA Tactile Feedback | Expandable vertical EV compensation scale with fluid wave animation and physical ratchet click vibrations (`VibrationEffect.EFFECT_TICK`) |
 | **Sony Alpha Composition Grids** | ✅ 6 Precision Guides | Rule of 3rds (3×3), Square Grid (4×4), Diag. + Square (Sony Alpha signature diagonal guides), Golden Ratio (Phi), Center Crosshair, and Off |
 | **Calibrated Gyro Horizon Level** | ✅ MotCamera5 Algorithmic Calibration | Extracted from Motorola Camera 5 (`MultiSensorOrientationEventListener` & `LevelerComponent`) with planar desk detection and 10-sample rolling average smoothing |
 | **Aspect Ratios** | ✅ 5 Cinematic & Photo Ratios | 4:3, 16:9, 1:1 square, 3:2 classical 35mm, and 21:9 ultra-wide cinematic framing with M3 rounded corner viewfinders |

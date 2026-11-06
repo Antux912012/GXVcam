@@ -52,6 +52,8 @@ import org.gxvcam.ui.state.MotoVideoSettings
 import org.gxvcam.ui.state.OpticalLens
 import org.gxvcam.ui.state.ProHardwareCapabilities
 import org.gxvcam.ui.state.ProSettings
+import org.gxvcam.ui.state.SonyAeMode
+import org.gxvcam.ui.state.SonyAfMode
 import org.gxvcam.ui.state.WhiteBalanceMode
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -667,12 +669,30 @@ class GXVcamController(
         }
     }
 
-    fun triggerTapToFocus(x: Float, y: Float, isLocked: Boolean = false) {
+    fun triggerTapToFocus(
+        x: Float,
+        y: Float,
+        isAeLocked: Boolean = false,
+        isAfLocked: Boolean = false
+    ) {
         val cam = camera ?: return
         try {
             val point = previewView.meteringPointFactory.createPoint(x, y)
-            val builder = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
-            if (isLocked) {
+            var flags = 0
+            if (!isAfLocked) {
+                flags = flags or FocusMeteringAction.FLAG_AF
+            }
+            if (!isAeLocked) {
+                flags = flags or FocusMeteringAction.FLAG_AE
+            }
+
+            if (flags == 0) {
+                // Both AE and AF are locked, keep active lock without changing
+                return
+            }
+
+            val builder = FocusMeteringAction.Builder(point, flags)
+            if (isAfLocked || isAeLocked) {
                 builder.disableAutoCancel()
             } else {
                 builder.setAutoCancelDuration(4, TimeUnit.SECONDS)
@@ -683,13 +703,94 @@ class GXVcamController(
         }
     }
 
-    fun unlockAeAf() {
+    // Overload for backward compatibility
+    fun triggerTapToFocus(x: Float, y: Float, isLocked: Boolean) {
+        triggerTapToFocus(x, y, isAeLocked = isLocked, isAfLocked = isLocked)
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    fun setAeLock(locked: Boolean) {
+        val cam = camera ?: return
+        try {
+            val control2 = Camera2CameraControl.from(cam.cameraControl)
+            val optionsBuilder = CaptureRequestOptions.Builder()
+            optionsBuilder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_LOCK, locked)
+            control2.addCaptureRequestOptions(optionsBuilder.build())
+            Log.d(TAG, "Applied separate AE Lock: $locked")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to apply AE lock: ${e.message}")
+        }
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    fun setAfMode(mode: SonyAfMode, locked: Boolean = false) {
+        val cam = camera ?: return
+        try {
+            val control2 = Camera2CameraControl.from(cam.cameraControl)
+            val optionsBuilder = CaptureRequestOptions.Builder()
+            val afMode = when {
+                locked || mode == SonyAfMode.AF_L -> CaptureRequest.CONTROL_AF_MODE_AUTO
+                mode == SonyAfMode.MF -> CaptureRequest.CONTROL_AF_MODE_OFF
+                mode == SonyAfMode.AF_S -> CaptureRequest.CONTROL_AF_MODE_AUTO
+                mode == SonyAfMode.AF_AUTO -> CaptureRequest.CONTROL_AF_MODE_AUTO
+                else -> CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+            }
+            optionsBuilder.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, afMode)
+            control2.addCaptureRequestOptions(optionsBuilder.build())
+            Log.d(TAG, "Applied Sony AF Mode: $mode, locked: $locked")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to apply Sony AF Mode: ${e.message}")
+        }
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    fun setAeMode(mode: SonyAeMode, locked: Boolean = false) {
+        val cam = camera ?: return
+        try {
+            val control2 = Camera2CameraControl.from(cam.cameraControl)
+            val optionsBuilder = CaptureRequestOptions.Builder()
+            if (locked || mode == SonyAeMode.AE_L) {
+                optionsBuilder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_LOCK, true)
+            } else {
+                optionsBuilder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_LOCK, false)
+                when (mode) {
+                    SonyAeMode.AE_M -> {
+                        optionsBuilder.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_OFF
+                        )
+                    }
+                    else -> {
+                        optionsBuilder.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_ON
+                        )
+                    }
+                }
+            }
+            control2.addCaptureRequestOptions(optionsBuilder.build())
+            Log.d(TAG, "Applied Sony AE Mode: $mode, locked: $locked")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to apply Sony AE Mode: ${e.message}")
+        }
+    }
+
+    fun unlockAe() {
+        setAeLock(false)
+    }
+
+    fun unlockAf() {
         val cam = camera ?: return
         try {
             cam.cameraControl.cancelFocusAndMetering()
         } catch (e: Exception) {
-            Log.w(TAG, "Unlock AE/AF failed: ${e.message}")
+            Log.w(TAG, "Unlock AF failed: ${e.message}")
         }
+    }
+
+    fun unlockAeAf() {
+        setAeLock(false)
+        unlockAf()
     }
 
     fun setExposureCompensation(evIndex: Int) {

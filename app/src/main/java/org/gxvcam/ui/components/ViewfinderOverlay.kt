@@ -68,7 +68,9 @@ fun GXVViewfinderContainer(
     showHorizon: Boolean,
     levelHorizonDegrees: Float,
     currentZoom: Float,
-    isAeAfLocked: Boolean = false,
+    isAeLocked: Boolean = false,
+    isAfLocked: Boolean = false,
+    isAeAfLocked: Boolean = isAeLocked && isAfLocked,
     onEvent: (GXVcamEvent) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
@@ -114,11 +116,13 @@ fun GXVViewfinderContainer(
     var currentScrubY by remember { mutableFloatStateOf(0f) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
+    val anyLocked = isAeLocked || isAfLocked || isAeAfLocked
+
     // Auto-dismiss focus ring if not locked and not scrubbing EV
-    LaunchedEffect(focusPosition, isAeAfLocked, isEvExpanded) {
+    LaunchedEffect(focusPosition, anyLocked, isEvExpanded) {
         if (focusPosition != null) {
             showFocusRing = true
-            if (!isAeAfLocked && !isEvExpanded) {
+            if (!anyLocked && !isEvExpanded) {
                 delay(4000)
                 showFocusRing = false
             }
@@ -182,7 +186,7 @@ fun GXVViewfinderContainer(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onEvent(
                             GXVcamEvent.SetAeAfLock(
-                                locked = true,
+                                locked = !anyLocked,
                                 x = offset.x,
                                 y = offset.y
                             )
@@ -348,7 +352,7 @@ fun GXVViewfinderContainer(
                     }
                 }
 
-                val activeFocusColor = if (isAeAfLocked) Color(0xFFFFB74D) else MaterialTheme.colorScheme.primary
+                val activeFocusColor = if (anyLocked) Color(0xFFFFB74D) else MaterialTheme.colorScheme.primary
 
                 // 1. Focus Reticle Box with Sony Alpha corner brackets
                 Box(
@@ -390,46 +394,88 @@ fun GXVViewfinderContainer(
                     }
                 }
 
-                // 2. AE/AF Lock Badge Pill (Above Reticle)
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isAeAfLocked) Color(0xDDFFB74D) else Color(0xAA000000),
-                    border = BorderStroke(1.dp, if (isAeAfLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f)),
+                // 2. Separate AE-L and AF-L Lock Badge Pills (Above Reticle)
+                Row(
                     modifier = Modifier
                         .offset {
                             IntOffset(
-                                (pos.x - with(density) { 50.dp.toPx() }).roundToInt(),
+                                (pos.x - with(density) { 56.dp.toPx() }).roundToInt(),
                                 (pos.y - with(density) { 62.dp.toPx() }).roundToInt()
                             )
-                        }
-                        .clickable {
+                        },
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // AE-L Lock Pill
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isAeLocked) Color(0xDDFFB74D) else Color(0xAA000000),
+                        border = BorderStroke(1.dp, if (isAeLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f)),
+                        modifier = Modifier.clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onEvent(
-                                GXVcamEvent.SetAeAfLock(
-                                    locked = !isAeAfLocked,
+                                GXVcamEvent.SetAeLock(
+                                    locked = !isAeLocked,
                                     x = pos.x,
                                     y = pos.y
                                 )
                             )
                         }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = if (isAeAfLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = "AE/AF Lock",
-                            tint = if (isAeAfLocked) Color.Black else Color.White,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = if (isAeAfLocked) "AE/AF LOCKED" else "AE-L / AF-L",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isAeAfLocked) Color.Black else Color.White
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isAeLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = "AE Lock",
+                                tint = if (isAeLocked) Color.Black else Color.White,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = "AE-L",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isAeLocked) Color.Black else Color.White
+                            )
+                        }
+                    }
+
+                    // AF-L Lock Pill
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isAfLocked) Color(0xDDFFB74D) else Color(0xAA000000),
+                        border = BorderStroke(1.dp, if (isAfLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f)),
+                        modifier = Modifier.clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onEvent(
+                                GXVcamEvent.SetAfLock(
+                                    locked = !isAfLocked,
+                                    x = pos.x,
+                                    y = pos.y
+                                )
+                            )
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isAfLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = "AF Lock",
+                                tint = if (isAfLocked) Color.Black else Color.White,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = "AF-L",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isAfLocked) Color.Black else Color.White
+                            )
+                        }
                     }
                 }
 

@@ -353,6 +353,22 @@ data class HistogramData(
     }
 }
 
+enum class SonyAfMode(val label: String, val shortLabel: String, val description: String) {
+    AF_C("AF-C (Continuous)", "AF-C", "Continuous autofocus tracks moving subjects"),
+    AF_S("AF-S (Single-shot)", "AF-S", "Locks focus once acquired until shot"),
+    AF_AUTO("AF-Auto (Automatic)", "AF-Auto", "Switches between single and continuous automatically"),
+    AF_L("AF-L (Focus Lock)", "AF-L", "Focus distance is frozen at current point"),
+    MF("AF-M (Manual Focus)", "AF-M", "Disengages autofocus for manual control");
+}
+
+enum class SonyAeMode(val label: String, val shortLabel: String, val description: String) {
+    AE_AUTO("AE (Auto / Multi)", "AE", "Evaluative multi-zone scene exposure metering"),
+    AE_CENTER("AE-Center", "AE-Ctr", "Center-weighted average metering"),
+    AE_SPOT("AE-Spot", "AE-Spot", "Spot metering at current focus point"),
+    AE_L("AE-L (Exposure Lock)", "AE-L", "Exposure values are frozen at current point"),
+    AE_M("AE-M (Manual Exp)", "AE-M", "Manual ISO and shutter speed control");
+}
+
 @Immutable
 data class GXVcamUiState(
     val currentMode: CameraMode = CameraMode.PHOTO,
@@ -377,9 +393,14 @@ data class GXVcamUiState(
     val agcSettings: AgcLibPatcherSettings = AgcLibPatcherSettings(),
     val hardwareCapabilities: ProHardwareCapabilities = ProHardwareCapabilities(),
     val histogram: HistogramData = HistogramData(),
-    val isAeAfLocked: Boolean = false,
+    val isAeLocked: Boolean = false,
+    val isAfLocked: Boolean = false,
+    val sonyAfMode: SonyAfMode = SonyAfMode.AF_C,
+    val sonyAeMode: SonyAeMode = SonyAeMode.AE_AUTO,
     val tapFocusEvOffset: Float = 0f
-)
+) {
+    val isAeAfLocked: Boolean get() = isAeLocked && isAfLocked
+}
 
 sealed interface GXVcamEvent {
     // STE100 Specific Events
@@ -391,7 +412,11 @@ sealed interface GXVcamEvent {
     data object CycleAspectRatio : GXVcamEvent
     data object ToggleGrid : GXVcamEvent
     data class SetGridType(val gridType: GridType) : GXVcamEvent
+    data class SetAeLock(val locked: Boolean, val x: Float = 0f, val y: Float = 0f) : GXVcamEvent
+    data class SetAfLock(val locked: Boolean, val x: Float = 0f, val y: Float = 0f) : GXVcamEvent
     data class SetAeAfLock(val locked: Boolean, val x: Float = 0f, val y: Float = 0f) : GXVcamEvent
+    data class SetSonyAfMode(val mode: SonyAfMode) : GXVcamEvent
+    data class SetSonyAeMode(val mode: SonyAeMode) : GXVcamEvent
     data class SetTapFocusEv(val ev: Float) : GXVcamEvent
     data class UpdateProSettings(val settings: ProSettings) : GXVcamEvent
     data class UpdateHardwareCapabilities(val capabilities: ProHardwareCapabilities) : GXVcamEvent

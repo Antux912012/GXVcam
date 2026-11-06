@@ -22,6 +22,8 @@ import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.CaptureFormat
 import org.gxvcam.ui.state.FlashMode
 import org.gxvcam.ui.state.GridType
+import org.gxvcam.ui.state.SonyAeMode
+import org.gxvcam.ui.state.SonyAfMode
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
 
 @Composable
@@ -31,6 +33,10 @@ fun TopQuickSettingsBar(
     gridEnabled: Boolean,
     gridType: GridType = GridType.RULE_OF_THIRDS,
     activeProfile: AgcColorProfile = AgcColorProfile.ZEISS_NATURAL,
+    isAeLocked: Boolean = false,
+    isAfLocked: Boolean = false,
+    sonyAeMode: SonyAeMode = SonyAeMode.AE_AUTO,
+    sonyAfMode: SonyAfMode = SonyAfMode.AF_C,
     isRecording: Boolean,
     recordingDurationMs: Long,
     onCycleFlash: () -> Unit,
@@ -38,6 +44,10 @@ fun TopQuickSettingsBar(
     onToggleGrid: () -> Unit,
     onSelectGrid: (GridType) -> Unit = {},
     onSelectProfile: (AgcColorProfile) -> Unit = {},
+    onToggleAeLock: () -> Unit = {},
+    onToggleAfLock: () -> Unit = {},
+    onSelectAeMode: (SonyAeMode) -> Unit = {},
+    onSelectAfMode: (SonyAfMode) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenLibPatcher: () -> Unit = {},
     isProMode: Boolean = false,
@@ -52,6 +62,8 @@ fun TopQuickSettingsBar(
 
     var showProfileMenu by remember { mutableStateOf(false) }
     var showGridMenu by remember { mutableStateOf(false) }
+    var showAeMenu by remember { mutableStateOf(false) }
+    var showAfMenu by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -194,6 +206,230 @@ fun TopQuickSettingsBar(
                             onOpenLibPatcher()
                         }
                     )
+                }
+            }
+
+            // AE Button (Sony Alpha Auto Exposure Mode & Lock)
+            Box {
+                FilledTonalButton(
+                    onClick = { showAeMenu = true },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (isAeLocked) Color(0xFFFFB74D) else buttonContainerColor,
+                        contentColor = if (isAeLocked) Color.Black else MaterialTheme.colorScheme.primary
+                    ),
+                    border = if (isAeLocked) null else borderStroke,
+                    contentPadding = PaddingValues(horizontal = 7.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    if (isAeLocked) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "AE Locked",
+                            modifier = Modifier.size(12.dp),
+                            tint = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                    }
+                    Text(
+                        text = if (isAeLocked) "AE-L" else sonyAeMode.shortLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isAeLocked) Color.Black else Color.White
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showAeMenu,
+                    onDismissRequest = { showAeMenu = false },
+                    modifier = Modifier
+                        .background(Color(0xFF1E1E1E))
+                        .widthIn(min = 230.dp)
+                ) {
+                    Text(
+                        text = "EXPOSURE MODE & LOCK (SONY)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+
+                    // Quick Toggle for AE Lock
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isAeLocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                                    contentDescription = "Toggle AE Lock",
+                                    tint = if (isAeLocked) Color(0xFFFFB74D) else Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isAeLocked) "Unlock Exposure (AE)" else "Lock Exposure (AE-L)",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isAeLocked) Color(0xFFFFB74D) else Color.White
+                                )
+                            }
+                        },
+                        onClick = {
+                            onToggleAeLock()
+                            showAeMenu = false
+                        }
+                    )
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+
+                    SonyAeMode.entries.forEach { mode ->
+                        val isSelected = (sonyAeMode == mode && !isAeLocked) || (mode == SonyAeMode.AE_L && isAeLocked)
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = mode.label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                    )
+                                    Text(
+                                        text = mode.description,
+                                        fontSize = 10.sp,
+                                        color = Color.White.copy(alpha = 0.6f)
+                                    )
+                                }
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            },
+                            onClick = {
+                                if (mode == SonyAeMode.AE_L) {
+                                    onToggleAeLock()
+                                } else {
+                                    onSelectAeMode(mode)
+                                }
+                                showAeMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // AF Button (Sony Alpha Auto Focus Mode & Lock)
+            Box {
+                FilledTonalButton(
+                    onClick = { showAfMenu = true },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (isAfLocked) Color(0xFFFFB74D) else buttonContainerColor,
+                        contentColor = if (isAfLocked) Color.Black else MaterialTheme.colorScheme.primary
+                    ),
+                    border = if (isAfLocked) null else borderStroke,
+                    contentPadding = PaddingValues(horizontal = 7.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    if (isAfLocked) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "AF Locked",
+                            modifier = Modifier.size(12.dp),
+                            tint = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                    }
+                    Text(
+                        text = if (isAfLocked) "AF-L" else sonyAfMode.shortLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isAfLocked) Color.Black else Color.White
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showAfMenu,
+                    onDismissRequest = { showAfMenu = false },
+                    modifier = Modifier
+                        .background(Color(0xFF1E1E1E))
+                        .widthIn(min = 230.dp)
+                ) {
+                    Text(
+                        text = "FOCUS MODE & LOCK (SONY)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+
+                    // Quick Toggle for AF Lock
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isAfLocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                                    contentDescription = "Toggle AF Lock",
+                                    tint = if (isAfLocked) Color(0xFFFFB74D) else Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isAfLocked) "Unlock Focus (AF)" else "Lock Focus (AF-L)",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isAfLocked) Color(0xFFFFB74D) else Color.White
+                                )
+                            }
+                        },
+                        onClick = {
+                            onToggleAfLock()
+                            showAfMenu = false
+                        }
+                    )
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+
+                    SonyAfMode.entries.forEach { mode ->
+                        val isSelected = (sonyAfMode == mode && !isAfLocked) || (mode == SonyAfMode.AF_L && isAfLocked)
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = mode.label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                    )
+                                    Text(
+                                        text = mode.description,
+                                        fontSize = 10.sp,
+                                        color = Color.White.copy(alpha = 0.6f)
+                                    )
+                                }
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            },
+                            onClick = {
+                                if (mode == SonyAfMode.AF_L) {
+                                    onToggleAfLock()
+                                } else {
+                                    onSelectAfMode(mode)
+                                }
+                                showAfMenu = false
+                            }
+                        )
+                    }
                 }
             }
         }

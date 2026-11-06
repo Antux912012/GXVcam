@@ -21,9 +21,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gxvcam.ui.state.AccentTheme
 import org.gxvcam.ui.state.CameraManualSettings
+import org.gxvcam.ui.state.CaptureFormat
+import org.gxvcam.ui.state.ColorSpaceOption
 import org.gxvcam.ui.state.GridType
 import org.gxvcam.ui.state.ProLayoutPosition
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -195,13 +198,125 @@ fun CameraSettingsBottomSheet(
                 title = "GCam Computational Photography",
             )
 
-            // RAW+JPEG Capture
-            SettingsToggleCard(
-                title = "RAW + JPEG Capture",
-                description = "Saves 16-bit DNG RAW files alongside processed JPEG photos.",
-                checked = settings.isRawAndJpegEnabled,
-                onCheckedChange = { onUpdateSettings(settings.copy(isRawAndJpegEnabled = it)) },
-            )
+            // Photo Capture Format (JPEG only / RAW only / RAW+JPEG)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Photo Capture Format",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Select whether to save JPEG, 16-bit uncompressed DNG RAW, or both",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CaptureFormat.entries.forEach { format ->
+                        val isSelected = settings.captureFormat == format
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                onUpdateSettings(
+                                    settings.copy(
+                                        captureFormat = format,
+                                        isRawAndJpegEnabled = format.isRaw
+                                    )
+                                )
+                            },
+                            label = { Text(format.label, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        )
+                    }
+                }
+            }
+
+            // Color Space Selection (sRGB / DCI-P3 / Adobe RGB)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Color Space Gamut",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Select photographic color space: sRGB, DCI-P3 wide gamut, or Adobe RGB",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ColorSpaceOption.entries.forEach { cs ->
+                        val isSelected = settings.colorSpace == cs
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onUpdateSettings(settings.copy(colorSpace = cs)) },
+                            label = { Text(cs.label, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        )
+                    }
+                }
+            }
+
+            // JPEG Compression / Quality Slider
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "JPEG Compression Quality",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
+                        Text(
+                            text = if (settings.jpegQuality == 85) "85% (Default)" else "${settings.jpegQuality}%",
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = "Higher quality preserves finer details and textures with lower compression",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                )
+                Slider(
+                    value = settings.jpegQuality.toFloat(),
+                    onValueChange = { onUpdateSettings(settings.copy(jpegQuality = it.roundToInt())) },
+                    valueRange = 50f..100f,
+                    steps = 49,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("50% (Small file)", fontSize = 11.sp, color = Color.Gray)
+                    Text("85% (Default)", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("100% (Maximum)", fontSize = 11.sp, color = Color.Gray)
+                }
+            }
 
             // HDR+ Multi-Frame Count
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

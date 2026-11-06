@@ -10,8 +10,10 @@ import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.media.ExifInterface
 import android.util.Log
+import android.os.Build
 import org.gxvcam.ui.state.AgcColorProfile
 import org.gxvcam.ui.state.AspectRatio
+import org.gxvcam.ui.state.ColorSpaceOption
 import org.gxvcam.ui.state.OpticalLens
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -35,7 +37,9 @@ object GXVImageProcessor {
         profile: AgcColorProfile = AgcColorProfile.ZEISS_NATURAL,
         activeLens: OpticalLens = OpticalLens.MAIN_1X,
         customSettings: org.gxvcam.ui.state.AgcLibPatcherSettings? = null,
-        aspectRatio: AspectRatio = AspectRatio.RATIO_4_3
+        aspectRatio: AspectRatio = AspectRatio.RATIO_4_3,
+        colorSpace: ColorSpaceOption = ColorSpaceOption.SRGB,
+        jpegQuality: Int = 85
     ): ByteArray {
         val startTime = System.currentTimeMillis()
         try {
@@ -46,14 +50,23 @@ object GXVImageProcessor {
             val rawBitmap = BitmapFactory.decodeByteArray(inputJpeg, 0, inputJpeg.size, null)
                 ?: return inputJpeg
 
-            // Crop to target aspect ratio (1:1, 3:2, 21:9, FULL, etc.)
+            // Crop to target aspect ratio (1:1, 3:2, 21:9, etc.)
             val decodedBitmap = cropToAspectRatio(rawBitmap, aspectRatio)
 
             val width = decodedBitmap.width
             val height = decodedBitmap.height
 
-            // 3. Sensor-Calibrated Color Science & White Balance Correction
-            val processedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            // 3. Sensor-Calibrated Color Science with requested Color Space (sRGB / DCI-P3 / Adobe RGB)
+            val processedBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val named = when (colorSpace) {
+                    ColorSpaceOption.SRGB -> android.graphics.ColorSpace.Named.SRGB
+                    ColorSpaceOption.DCI_P3 -> android.graphics.ColorSpace.Named.DISPLAY_P3
+                    ColorSpaceOption.ADOBE_RGB -> android.graphics.ColorSpace.Named.ADOBE_RGB
+                }
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888, true, android.graphics.ColorSpace.get(named))
+            } else {
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            }
             val canvas = Canvas(processedBitmap)
 
             val colorFilter = buildSensorColorFilter(profile, activeLens, customSettings, forLiveViewfinder = false)
@@ -72,17 +85,18 @@ object GXVImageProcessor {
                 applyVignette(canvas, width, height, vignette)
             }
 
-            // 6. Compress to High-Quality JPEG (96% quality)
+            // 6. Compress to JPEG with user-defined quality setting (default 85%, up to 100%)
+            val quality = jpegQuality.coerceIn(50, 100)
             val outputStream = ByteArrayOutputStream(inputJpeg.size + 1024 * 512)
-            processedBitmap.compress(Bitmap.CompressFormat.JPEG, 96, outputStream)
+            processedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
             processedBitmap.recycle()
             val compressedBytes = outputStream.toByteArray()
 
-            // 7. Re-apply preserved EXIF attributes
-            val finalJpeg = writeExifAttributes(compressedBytes, exifTags, profile)
+            // 7. Re-apply preserved EXIF attributes with color space metadata
+            val finalJpeg = writeExifAttributes(compressedBytes, exifTags, profile, colorSpace)
 
             val elapsed = System.currentTimeMillis() - startTime
-            Log.i(TAG, "Processed ${width}x${height} JPEG with '${profile.label}' in ${elapsed}ms (${finalJpeg.size} bytes)")
+            Log.i(TAG, "Processed ${width}x${height} JPEG with '${profile.label}' [${colorSpace.label}, Q=${quality}%] in ${elapsed}ms (${finalJpeg.size} bytes)")
             return finalJpeg
         } catch (e: Exception) {
             Log.e(TAG, "Error processing JPEG: ${e.message}", e)
@@ -100,7 +114,6 @@ object GXVImageProcessor {
             AspectRatio.RATIO_1_1 -> 1.0f
             AspectRatio.RATIO_3_2 -> 3f / 2f
             AspectRatio.RATIO_21_9 -> 21f / 9f
-            AspectRatio.RATIO_FULL -> 20f / 9f
         }
         val desiredRatio = if (isLandscape) targetRatio else (1f / targetRatio)
         val currentRatio = w.toFloat() / h.toFloat()
@@ -357,7 +370,8 @@ object GXVImageProcessor {
     private fun writeExifAttributes(
         jpegBytes: ByteArray,
         exifTags: Map<String, String>,
-        profile: AgcColorProfile
+        profile: AgcColorProfile,
+        colorSpace: ColorSpaceOption = ColorSpaceOption.SRGB
     ): ByteArray {
         return try {
             val tempFile = File.createTempFile("gxv_exif_", ".jpg")
@@ -367,10 +381,12 @@ object GXVImageProcessor {
             for ((tag, value) in exifTags) {
                 exifInterface.setAttribute(tag, value)
             }
-            // Add custom software attribution
+            // Add custom software attribution and color space tag
             exifInterface.setAttribute(ExifInterface.TAG_SOFTWARE, "GXVcam (${profile.label} Engine)")
             exifInterface.setAttribute(ExifInterface.TAG_MAKE, "Motorola")
             exifInterface.setAttribute(ExifInterface.TAG_MODEL, "motorola edge 50 neo")
+            val csVal = if (colorSpace == ColorSpaceOption.SRGB) "1" else "65535"
+            exifInterface.setAttribute(ExifInterface.TAG_COLOR_SPACE, csVal)
             exifInterface.saveAttributes()
 
             val result = tempFile.readBytes()

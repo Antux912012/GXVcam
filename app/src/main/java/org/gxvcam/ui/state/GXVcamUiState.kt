@@ -61,8 +61,7 @@ enum class AspectRatio(val ratioValue: Float, val label: String) {
     RATIO_16_9(0.5625f, "16:9"),
     RATIO_1_1(1.0f, "1:1"),
     RATIO_3_2(2f / 3f, "3:2"),
-    RATIO_21_9(9f / 21f, "21:9"),
-    RATIO_FULL(0.45f, "FULL");
+    RATIO_21_9(9f / 21f, "21:9");
 
     val ratio: Float get() = ratioValue
 }
@@ -243,6 +242,21 @@ enum class WhiteBalanceMode(val label: String, val kelvin: Int, val awbMode: Int
     CUSTOM("Custom", 5500, 0),
 }
 
+enum class ColorSpaceOption(val label: String, val description: String) {
+    SRGB("sRGB", "Standard gamut for web and general screen sharing"),
+    DCI_P3("DCI-P3", "Wide color gamut (Display P3) with richer greens and reds"),
+    ADOBE_RGB("Adobe RGB", "Expanded color gamut for professional print & editing");
+}
+
+enum class CaptureFormat(val label: String, val shortLabel: String, val description: String) {
+    JPEG("JPEG only", "JPG", "High-efficiency compressed photo with ISP color science"),
+    RAW("RAW only", "RAW", "16-bit uncompressed DNG digital negative direct from sensor"),
+    RAW_AND_JPEG("RAW + JPEG", "RAW+JPG", "Captures both uncompressed DNG and processed JPEG");
+
+    val isRaw: Boolean get() = this == RAW || this == RAW_AND_JPEG
+    val isJpeg: Boolean get() = this == JPEG || this == RAW_AND_JPEG
+}
+
 @Immutable
 data class ProSettings(
     val isManualIso: Boolean = false,
@@ -255,6 +269,7 @@ data class ProSettings(
     val whiteBalanceMode: WhiteBalanceMode = WhiteBalanceMode.AUTO,
     val whiteBalanceKelvin: Int = 5500,
     val isRawAndJpegEnabled: Boolean = false,
+    val captureFormat: CaptureFormat = CaptureFormat.JPEG,
 ) {
     val isManualExposure: Boolean get() = isManualIso || isManualShutter
     val isAnyManual: Boolean get() = isManualIso || isManualShutter || isManualFocus || (whiteBalanceMode != WhiteBalanceMode.AUTO) || (evIndex != 0)
@@ -298,6 +313,9 @@ data class CameraManualSettings(
     val isSuperNightEnabled: Boolean = true,
     val antiBandingMode: Int = 3, // 0=Off, 1=50Hz, 2=60Hz, 3=Auto
     val isRawAndJpegEnabled: Boolean = false,
+    val captureFormat: CaptureFormat = CaptureFormat.JPEG,
+    val colorSpace: ColorSpaceOption = ColorSpaceOption.SRGB,
+    val jpegQuality: Int = 85,
     val hdrFrameCount: Int = 8,
     val isWatermarkEnabled: Boolean = false,
     val isHistogramOverlayVisible: Boolean = true,
@@ -375,6 +393,10 @@ sealed interface GXVcamEvent {
     data class OnPhotoCaptured(val uri: Uri) : GXVcamEvent
     data class SetRecordingState(val isRecording: Boolean) : GXVcamEvent
     data object ToggleRawCapture : GXVcamEvent
+    data object CycleCaptureFormat : GXVcamEvent
+    data class SetCaptureFormat(val format: CaptureFormat) : GXVcamEvent
+    data class SetColorSpace(val colorSpace: ColorSpaceOption) : GXVcamEvent
+    data class SetJpegQuality(val quality: Int) : GXVcamEvent
     data object ToggleSettingsSheet : GXVcamEvent
     data class UpdateManualSettings(val settings: CameraManualSettings) : GXVcamEvent
     data object ResetProToAuto : GXVcamEvent

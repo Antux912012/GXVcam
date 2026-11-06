@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gxvcam.ui.state.AspectRatio
+import org.gxvcam.ui.state.CaptureFormat
 import org.gxvcam.ui.state.FlashMode
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -34,8 +35,8 @@ fun TopQuickSettingsBar(
     onOpenSettings: () -> Unit = {},
     isProMode: Boolean = false,
     isRawSupported: Boolean = false,
-    isRawAndJpegEnabled: Boolean = false,
-    onToggleRaw: () -> Unit = {},
+    captureFormat: CaptureFormat = CaptureFormat.JPEG,
+    onCycleCaptureFormat: () -> Unit = {},
     onToggleAgc: () -> Unit = {},
     isFull: Boolean = false,
     modifier: Modifier = Modifier
@@ -111,20 +112,20 @@ fun TopQuickSettingsBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // RAW+JPG Toggle in Pro Mode
+                // Capture Format Toggle (JPEG / RAW / RAW+JPEG) in Pro Mode
                 if (isProMode && isRawSupported) {
                     FilledTonalButton(
-                        onClick = onToggleRaw,
+                        onClick = onCycleCaptureFormat,
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = if (isRawAndJpegEnabled) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = if (isFull) 0.85f else 1f) else buttonContainerColor,
-                            contentColor = if (isRawAndJpegEnabled) MaterialTheme.colorScheme.onTertiaryContainer else Color.White
+                            containerColor = if (captureFormat != CaptureFormat.JPEG) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = if (isFull) 0.85f else 1f) else buttonContainerColor,
+                            contentColor = if (captureFormat != CaptureFormat.JPEG) MaterialTheme.colorScheme.onTertiaryContainer else Color.White
                         ),
-                        border = if (!isRawAndJpegEnabled) borderStroke else null,
+                        border = if (captureFormat == CaptureFormat.JPEG) borderStroke else null,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.height(36.dp)
                     ) {
                         Text(
-                            text = if (isRawAndJpegEnabled) "RAW+JPG" else "JPG",
+                            text = captureFormat.shortLabel,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )

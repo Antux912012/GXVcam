@@ -144,16 +144,44 @@ class GXVcamViewModel : ViewModel() {
                 }
             }
 
-            is GXVcamEvent.ToggleRawCapture -> {
-                if (_uiState.value.hardwareCapabilities.isRawSupported) {
-                    val newRawState = !_uiState.value.proSettings.isRawAndJpegEnabled
-                    _uiState.update {
-                        it.copy(proSettings = it.proSettings.copy(isRawAndJpegEnabled = newRawState))
-                    }
-                    if (lifecycleOwner != null) {
-                        rebindCamera(rawAndJpeg = newRawState)
-                    }
+            is GXVcamEvent.ToggleRawCapture,
+            is GXVcamEvent.CycleCaptureFormat -> {
+                val next = when (_uiState.value.manualSettings.captureFormat) {
+                    CaptureFormat.JPEG -> CaptureFormat.RAW
+                    CaptureFormat.RAW -> CaptureFormat.RAW_AND_JPEG
+                    CaptureFormat.RAW_AND_JPEG -> CaptureFormat.JPEG
                 }
+                _uiState.update {
+                    it.copy(
+                        manualSettings = it.manualSettings.copy(captureFormat = next, isRawAndJpegEnabled = next.isRaw),
+                        proSettings = it.proSettings.copy(captureFormat = next, isRawAndJpegEnabled = next.isRaw)
+                    )
+                }
+                controller?.applyManualSettings(_uiState.value.manualSettings)
+            }
+
+            is GXVcamEvent.SetCaptureFormat -> {
+                _uiState.update {
+                    it.copy(
+                        manualSettings = it.manualSettings.copy(captureFormat = event.format, isRawAndJpegEnabled = event.format.isRaw),
+                        proSettings = it.proSettings.copy(captureFormat = event.format, isRawAndJpegEnabled = event.format.isRaw)
+                    )
+                }
+                controller?.applyManualSettings(_uiState.value.manualSettings)
+            }
+
+            is GXVcamEvent.SetColorSpace -> {
+                _uiState.update {
+                    it.copy(manualSettings = it.manualSettings.copy(colorSpace = event.colorSpace))
+                }
+                controller?.applyManualSettings(_uiState.value.manualSettings)
+            }
+
+            is GXVcamEvent.SetJpegQuality -> {
+                _uiState.update {
+                    it.copy(manualSettings = it.manualSettings.copy(jpegQuality = event.quality.coerceIn(50, 100)))
+                }
+                controller?.applyManualSettings(_uiState.value.manualSettings)
             }
 
             is GXVcamEvent.OnTapToFocus -> {
@@ -336,8 +364,7 @@ class GXVcamViewModel : ViewModel() {
             AspectRatio.RATIO_16_9 -> AspectRatio.RATIO_1_1
             AspectRatio.RATIO_1_1 -> AspectRatio.RATIO_3_2
             AspectRatio.RATIO_3_2 -> AspectRatio.RATIO_21_9
-            AspectRatio.RATIO_21_9 -> AspectRatio.RATIO_FULL
-            AspectRatio.RATIO_FULL -> AspectRatio.RATIO_4_3
+            AspectRatio.RATIO_21_9 -> AspectRatio.RATIO_4_3
         }
         _uiState.update { it.copy(aspectRatio = next) }
         rebindCamera(aspectRatio = next)

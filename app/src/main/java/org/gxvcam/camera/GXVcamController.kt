@@ -206,8 +206,7 @@ class GXVcamController(
 
                 val targetRatio = when (aspectRatio) {
                     AspectRatio.RATIO_16_9,
-                    AspectRatio.RATIO_21_9,
-                    AspectRatio.RATIO_FULL -> androidx.camera.core.AspectRatio.RATIO_16_9
+                    AspectRatio.RATIO_21_9 -> androidx.camera.core.AspectRatio.RATIO_16_9
                     AspectRatio.RATIO_4_3,
                     AspectRatio.RATIO_1_1,
                     AspectRatio.RATIO_3_2 -> androidx.camera.core.AspectRatio.RATIO_4_3
@@ -704,6 +703,10 @@ class GXVcamController(
         val profile = currentAgcSettings.activeProfile
         val lens = currentActiveLens
         val agc = currentAgcSettings
+        val format = currentManualSettings.captureFormat
+        val colorSpace = currentManualSettings.colorSpace
+        val jpegQuality = currentManualSettings.jpegQuality
+        val ratio = lastBindConfig?.aspectRatio ?: AspectRatio.RATIO_4_3
 
         capture.takePicture(
             cameraExecutor,
@@ -715,44 +718,89 @@ class GXVcamController(
                         buffer.get(bytes)
                         image.close()
 
-                        // Process through Vivo/Zeiss & GCam HDR+ ISP pipeline with manual overrides & aspect ratio crop
-                        val processed = GXVImageProcessor.processJpeg(
-                            inputJpeg = bytes,
-                            profile = profile,
-                            activeLens = lens,
-                            customSettings = agc,
-                            aspectRatio = lastBindConfig?.aspectRatio ?: AspectRatio.RATIO_4_3
-                        )
-
                         val timestamp = System.currentTimeMillis()
-                        val contentValues = ContentValues().apply {
-                            put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_$timestamp.jpg")
-                            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/GXVcam")
-                                put(MediaStore.Images.Media.IS_PENDING, 1)
+                        var dngUri: android.net.Uri? = null
+                        var jpegUri: android.net.Uri? = null
+
+                        // 1. RAW / DNG Digital Negative Capture (if format is RAW or RAW_AND_JPEG)
+                        if (format.isRaw) {
+                            try {
+                                val dngValues = ContentValues().apply {
+                                    put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_$timestamp.dng")
+                                    put(MediaStore.MediaColumns.MIME_TYPE, "image/x-adobe-dng")
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                        put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/GXVcam")
+                                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                                    }
+                                }
+                                dngUri = context.contentResolver.insert(
+                                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                    dngValues
+                                )
+                                if (dngUri != null) {
+                                    context.contentResolver.openOutputStream(dngUri)?.use { out ->
+                                        out.write(bytes)
+                                        out.flush()
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                        val updateValues = ContentValues().apply {
+                                            put(MediaStore.Images.Media.IS_PENDING, 0)
+                                        }
+                                        context.contentResolver.update(dngUri, updateValues, null, null)
+                                    }
+                                    Log.i(TAG, "16-bit RAW DNG saved to $dngUri (${bytes.size} bytes)")
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error saving RAW DNG file: ${e.message}")
                             }
                         }
-                        val uri = context.contentResolver.insert(
-                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                            contentValues
-                        )
 
-                        if (uri != null) {
-                            context.contentResolver.openOutputStream(uri)?.use { out ->
-                                out.write(processed)
-                                out.flush()
-                            }
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                val updateValues = ContentValues().apply {
-                                    put(MediaStore.Images.Media.IS_PENDING, 0)
+                        // 2. Processed JPEG Capture (if format is JPEG or RAW_AND_JPEG)
+                        if (format.isJpeg) {
+                            val processed = GXVImageProcessor.processJpeg(
+                                inputJpeg = bytes,
+                                profile = profile,
+                                activeLens = lens,
+                                customSettings = agc,
+                                aspectRatio = ratio,
+                                colorSpace = colorSpace,
+                                jpegQuality = jpegQuality
+                            )
+
+                            val contentValues = ContentValues().apply {
+                                put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_$timestamp.jpg")
+                                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/GXVcam")
+                                    put(MediaStore.Images.Media.IS_PENDING, 1)
                                 }
-                                context.contentResolver.update(uri, updateValues, null, null)
                             }
+                            jpegUri = context.contentResolver.insert(
+                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                contentValues
+                            )
 
-                            Log.i(TAG, "Enhanced photo saved to $uri (${processed.size} bytes, profile: ${profile.label})")
+                            if (jpegUri != null) {
+                                context.contentResolver.openOutputStream(jpegUri)?.use { out ->
+                                    out.write(processed)
+                                    out.flush()
+                                }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    val updateValues = ContentValues().apply {
+                                        put(MediaStore.Images.Media.IS_PENDING, 0)
+                                    }
+                                    context.contentResolver.update(jpegUri, updateValues, null, null)
+                                }
+
+                                Log.i(TAG, "Enhanced photo saved to $jpegUri (${processed.size} bytes, profile: ${profile.label}, colorSpace: ${colorSpace.label}, Q=${jpegQuality}%)")
+                            }
+                        }
+
+                        // Notify UI with the appropriate URI
+                        val primaryUri = if (format == org.gxvcam.ui.state.CaptureFormat.RAW) dngUri else (jpegUri ?: dngUri)
+                        if (primaryUri != null) {
                             ContextCompat.getMainExecutor(context).execute {
-                                onEvent?.invoke(GXVcamEvent.OnPhotoCaptured(uri))
+                                onEvent?.invoke(GXVcamEvent.OnPhotoCaptured(primaryUri))
                             }
                         }
                     } catch (e: Exception) {

@@ -22,8 +22,12 @@ Pre-built APKs are available under GitHub Releases:
 | Area | State | Highlights |
 | :--- | :--- | :--- |
 | **Multi-Camera & Aux Sensors** | ✅ Verified on Edge 50 Neo | Bypasses `vendor.camera.aux.packagelist` to expose & bind Camera 0 (Main 50MP Sony IMX896), Camera 2 (13MP GalaxyCore GC13A2 Ultra-Wide 0.6x), Camera 3 (10MP Samsung S5K3K1 Telephoto 3x), and Camera 5 (Logical multi-camera) |
-| **M3 Expressive PRO Mode** | ✅ Complete & De-cluttered | Live parameter readout, instant AUTO reset per parameter & global RESET ALL, quick-stop chips (ISO 100–6400, Shutter 1/4000s–32s, White Balance modes + Kelvin slider, AF-C / Macro / Infinity) |
-| **MotCamera5 & GCam Settings** | ✅ Implemented | 50MP Quad-Bayer remosaic, ADRC dynamic range, Tintless lens shading, ZSL, Super Night, Anti-banding, RAW+JPEG DNG, Burst HDR+ frame count, Gyro Horizon level, RGB Histogram |
+| **Aspect Ratios** | ✅ 5 Cinematic & Photo Ratios | 4:3, 16:9, 1:1 square, 3:2 classical 35mm, and 21:9 ultra-wide cinematic framing with M3 rounded corner viewfinders |
+| **Color Space & Imaging** | ✅ Professional Gamuts | sRGB, DCI-P3 Wide Gamut, and Adobe RGB with embedded ColorSpace metadata; Adjustable JPEG compression quality slider (50%–100%, default 85%) |
+| **Capture Formats** | ✅ 3-Way Mode | JPEG only, 16-bit uncompressed RAW (.dng) only, and simultaneous RAW + JPEG capture |
+| **M3 Expressive PRO Mode** | ✅ Complete & De-cluttered | Live parameter readout, instant AUTO reset per parameter & global RESET ALL, quick-stop chips (ISO 100–6400, Shutter 1/4000s–32s, White Balance modes + Kelvin slider, AF-C / Macro / Infinity); configurable sidebar (Left/Right) or strip (Top/Bottom) |
+| **MotCamera5 & GCam Settings** | ✅ Implemented | 50MP Quad-Bayer remosaic, ADRC dynamic range, Tintless lens shading, ZSL, Super Night, Anti-banding, Burst HDR+ frame count, Gyro Horizon level, RGB Histogram |
+| **Theming & Accents** | ✅ Pantone & Material 3 | Motorola Edge 50 Neo Pantone editions (Poinciana, Nautical Blue, Lattè, Grisaille), Leica Amber, Expressive Mint, and Material You dynamic wallpaper |
 | **BigKaka AGC LibPatcher** | ✅ Implemented | Zeiss Natural, Leica Authentic, Leica Vibrant, Vivo Vivid, and Custom profiles with live viewfinder LUT (RenderEffect) |
 | **Vulkan & RAW Pipeline** | ✅ Implemented | 16-bit RAW_SENSOR unpacker with Vulkan compute shader and CPU reference |
 

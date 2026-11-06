@@ -1,22 +1,16 @@
 package org.gxvcam.ui
 
-import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.gxvcam.ui.components.*
@@ -55,30 +49,7 @@ fun GXVcamScreenContent(
     onOpenGallery: () -> Unit = {},
     viewfinderContent: @Composable () -> Unit
 ) {
-    val isFull = uiState.aspectRatio == AspectRatio.RATIO_FULL
-    val view = LocalView.current
-
-    // Immersive Mode: When FULL aspect ratio is selected, hide notification & time status bar
-    DisposableEffect(isFull) {
-        val window = (view.context as? Activity)?.window
-        if (window != null) {
-            val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            if (isFull) {
-                insetsController.hide(WindowInsetsCompat.Type.statusBars())
-            } else {
-                insetsController.show(WindowInsetsCompat.Type.statusBars())
-            }
-        }
-        onDispose {
-            val window = (view.context as? Activity)?.window
-            if (window != null) {
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.show(WindowInsetsCompat.Type.statusBars())
-            }
-        }
-    }
+    val isFull = false
 
     Box(
         modifier = modifier
@@ -105,7 +76,7 @@ fun GXVcamScreenContent(
             exit = fadeOut(GXVMotion.fastEffects()),
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = if (isFull) 60.dp else 72.dp, end = 16.dp)
+                .padding(top = 72.dp, end = 16.dp)
         ) {
             LiveRgbHistogram(
                 histogram = uiState.histogram,
@@ -131,8 +102,8 @@ fun GXVcamScreenContent(
                 onOpenSettings = { onEvent(GXVcamEvent.ToggleSettingsSheet) },
                 isProMode = uiState.currentMode == CameraMode.PRO,
                 isRawSupported = uiState.hardwareCapabilities.isRawSupported,
-                isRawAndJpegEnabled = uiState.proSettings.isRawAndJpegEnabled,
-                onToggleRaw = { onEvent(GXVcamEvent.ToggleRawCapture) },
+                captureFormat = uiState.manualSettings.captureFormat,
+                onCycleCaptureFormat = { onEvent(GXVcamEvent.CycleCaptureFormat) },
                 onToggleAgc = { onEvent(GXVcamEvent.ToggleAgcSheet) },
                 isFull = isFull
             )

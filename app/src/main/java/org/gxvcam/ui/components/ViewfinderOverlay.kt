@@ -84,18 +84,12 @@ fun GXVViewfinderContainer(
     }
 
     // M3 Expressive Corner shape & Aspect ratio animation
-    val cornerRadius by animateDpAsState(
-        targetValue = if (aspectRatio == AspectRatio.RATIO_FULL) 0.dp else 28.dp,
-        animationSpec = GXVMotion.spatialSmooth(),
-        label = "viewfinderCorners"
-    )
-
-    val isFull = aspectRatio == AspectRatio.RATIO_FULL
+    val cornerRadius = 28.dp
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(if (isFull) Color.Transparent else OledBlack)
+            .background(OledBlack)
             .onSizeChanged { containerSize = it }
             .pointerInput(Unit) {
                 detectTransformGestures { _, _, zoom, _ ->
@@ -130,9 +124,6 @@ fun GXVViewfinderContainer(
             AspectRatio.RATIO_1_1 -> 1.0f // Square 1:1
             AspectRatio.RATIO_3_2 -> 2f / 3f // 3:2
             AspectRatio.RATIO_21_9 -> 9f / 21f // 21:9
-            AspectRatio.RATIO_FULL -> if (containerSize.height > 0) {
-                containerSize.width.toFloat() / containerSize.height.toFloat()
-            } else 9f / 16f
         }
 
         val animatedAspectRatio by animateFloatAsState(
@@ -145,7 +136,7 @@ fun GXVViewfinderContainer(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(animatedAspectRatio)
-                .clip(RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp)))
+                .clip(RoundedCornerShape(cornerRadius))
                 .clipToBounds()
         ) {
             // Camera Preview Content

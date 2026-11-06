@@ -11,12 +11,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -453,7 +457,7 @@ fun MotoVideoQuickBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Resolution cycle (4K UHD / 1080p FHD / 720p HD)
+        // 1. Resolution (4K / 1080p / 720p)
         FilterChip(
             selected = true,
             onClick = {
@@ -465,14 +469,31 @@ fun MotoVideoQuickBar(
                 }
                 onUpdateVideo(videoSettings.copy(resolution = next))
             },
-            label = { Text(videoSettings.resolution.label) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Videocam,
+                    contentDescription = "Resolution",
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = {
+                Text(
+                    text = when (videoSettings.resolution) {
+                        VideoResolution.UHD_4K -> "4K"
+                        VideoResolution.FHD_1080P -> "FHD"
+                        VideoResolution.HD_720P -> "HD"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         )
 
-        // FPS mode cycle (30fps / 60fps / 120fps)
+        // 2. Frame Rate (30fps / 60fps / 120fps)
         FilterChip(
             selected = true,
             onClick = {
@@ -484,16 +505,30 @@ fun MotoVideoQuickBar(
                 }
                 onUpdateVideo(videoSettings.copy(frameRate = next))
             },
-            label = { Text(videoSettings.frameRate.label) },
+            leadingIcon = {
+                Icon(
+                    imageVector = if (videoSettings.frameRate == VideoFrameRate.SLOW_MO_120) Icons.Default.SlowMotionVideo else Icons.Default.Speed,
+                    contentDescription = "Frame Rate",
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = {
+                Text(
+                    text = "${videoSettings.frameRate.fps} fps",
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         )
 
-        // Stabilization mode cycle (Adaptive / Horizon Lock 360° / Off)
+        // 3. Stabilization mode (Adaptive / Horizon Lock 360° / Off)
+        val isStabActive = videoSettings.stabilization != MotoVideoStabilization.OFF
         FilterChip(
-            selected = videoSettings.stabilization != MotoVideoStabilization.OFF,
+            selected = isStabActive,
             onClick = {
                 tactile.triggerTick()
                 val next = when (videoSettings.stabilization) {
@@ -503,54 +538,123 @@ fun MotoVideoQuickBar(
                 }
                 onUpdateVideo(videoSettings.copy(stabilization = next))
             },
-            label = { Text(videoSettings.stabilization.label) }
+            leadingIcon = {
+                Icon(
+                    imageVector = when (videoSettings.stabilization) {
+                        MotoVideoStabilization.OFF -> Icons.Default.VideocamOff
+                        MotoVideoStabilization.ADAPTIVE -> Icons.Default.VideoStable
+                        MotoVideoStabilization.HORIZON_LOCK -> Icons.Default.ScreenRotation
+                    },
+                    contentDescription = "Stabilization",
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = {
+                Text(
+                    text = when (videoSettings.stabilization) {
+                        MotoVideoStabilization.OFF -> "EIS Off"
+                        MotoVideoStabilization.ADAPTIVE -> "OIS+EIS"
+                        MotoVideoStabilization.HORIZON_LOCK -> "360° Lock"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
         )
 
-        // Video Night Vision
+        // 4. Video Night Vision
         FilterChip(
             selected = videoSettings.isNightVisionVideoEnabled,
             onClick = {
                 tactile.triggerTick()
                 onUpdateVideo(videoSettings.copy(isNightVisionVideoEnabled = !videoSettings.isNightVisionVideoEnabled))
             },
-            label = { Text(if (videoSettings.isNightVisionVideoEnabled) "Night Video ON" else "Night Video") }
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Nightlight,
+                    contentDescription = "Night Video",
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = { Text("Night", fontWeight = FontWeight.SemiBold) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         )
 
-        // HDR10+ / 10-Bit HLG
+        // 5. HDR10+ / 10-Bit HLG
         FilterChip(
             selected = videoSettings.isHdr10BitEnabled,
             onClick = {
                 tactile.triggerTick()
                 onUpdateVideo(videoSettings.copy(isHdr10BitEnabled = !videoSettings.isHdr10BitEnabled))
             },
-            label = { Text(if (videoSettings.isHdr10BitEnabled) "HDR10+ 10-Bit" else "SDR 8-Bit") }
+            leadingIcon = {
+                Icon(
+                    imageVector = if (videoSettings.isHdr10BitEnabled) Icons.Default.HdrOn else Icons.Default.HdrOff,
+                    contentDescription = "HDR10+",
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = { Text(if (videoSettings.isHdr10BitEnabled) "HDR10+" else "SDR", fontWeight = FontWeight.SemiBold) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         )
 
-        // Audio Zoom (Microphone directionality tracking lens zoom)
+        // 6. Audio Zoom
         FilterChip(
             selected = videoSettings.isAudioZoomEnabled,
             onClick = {
                 tactile.triggerTick()
                 onUpdateVideo(videoSettings.copy(isAudioZoomEnabled = !videoSettings.isAudioZoomEnabled))
             },
-            label = { Text(if (videoSettings.isAudioZoomEnabled) "Audio Zoom ON" else "Audio Zoom") }
+            leadingIcon = {
+                Icon(
+                    imageVector = if (videoSettings.isAudioZoomEnabled) Icons.Default.GraphicEq else Icons.Default.Mic,
+                    contentDescription = "Audio Zoom",
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = { Text("Audio Zoom", fontWeight = FontWeight.SemiBold) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         )
 
-        // Dual Capture PIP
+        // 7. Dual Capture PIP
         FilterChip(
             selected = videoSettings.isDualCaptureEnabled,
             onClick = {
                 tactile.triggerTick()
                 onUpdateVideo(videoSettings.copy(isDualCaptureEnabled = !videoSettings.isDualCaptureEnabled))
             },
-            label = { Text(if (videoSettings.isDualCaptureEnabled) "Dual Cam ON" else "Dual Cam") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.PictureInPicture,
+                    contentDescription = "Dual Capture",
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = { Text("Dual Cam", fontWeight = FontWeight.SemiBold) },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         )
 
-        // Dual Capture Layout & Swap (Visible when Dual Capture is active)
+        // 8. Dual Capture Layout (Visible when Dual Capture is active)
         if (videoSettings.isDualCaptureEnabled) {
             FilterChip(
                 selected = true,
@@ -563,28 +667,49 @@ fun MotoVideoQuickBar(
                     }
                     onUpdateVideo(videoSettings.copy(dualCaptureLayout = nextLayout))
                 },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (videoSettings.dualCaptureLayout == DualCaptureLayout.PIP) {
+                            Icons.Default.PictureInPictureAlt
+                        } else {
+                            Icons.Default.VerticalSplit
+                        },
+                        contentDescription = "Dual Capture Layout",
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
                 label = {
                     Text(
-                        if (videoSettings.dualCaptureLayout == DualCaptureLayout.PIP) "Layout: PIP"
-                        else "Layout: Split 50:50"
+                        text = if (videoSettings.dualCaptureLayout == DualCaptureLayout.PIP) "PIP" else "50:50 Split",
+                        fontWeight = FontWeight.SemiBold
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             )
 
+            // 9. Instant Swap Camera Feed
             FilterChip(
                 selected = videoSettings.isDualCaptureSwapped,
                 onClick = {
                     tactile.triggerTick()
                     onUpdateVideo(videoSettings.copy(isDualCaptureSwapped = !videoSettings.isDualCaptureSwapped))
                 },
-                label = { Text("Swap ⇄") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.FlipCameraAndroid,
+                        contentDescription = "Swap Cameras",
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                label = { Text("Swap", fontWeight = FontWeight.SemiBold) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.onTertiaryContainer
                 )
             )
         }

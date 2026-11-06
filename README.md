@@ -1,5 +1,9 @@
 # GXVcam
 
+<p align="center">
+  <img src="docs/assets/icon.png" width="144" height="144" alt="GXVcam Icon" />
+</p>
+
 Camera app for **Android 14+ / Android 16 (SDK 36)** targeting the **Motorola Edge 50 Neo** (Dimensity 7300, tested on Android 16)
 and **Edge 60 Neo** (Dimensity 7400, Android 15/16):
 

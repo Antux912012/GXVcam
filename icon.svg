@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Squircle Gradient -->
+    <linearGradient id="bgPlate" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#212429"/>
+      <stop offset="100%" stop-color="#121316"/>
+    </linearGradient>
+
+    <!-- Camera Body Gradient -->
+    <linearGradient id="camBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2a4d79"/>
+      <stop offset="40%" stop-color="#223e63"/>
+      <stop offset="100%" stop-color="#15273f"/>
+    </linearGradient>
+
+    <!-- Top Rim Warm Sunset Glow -->
+    <linearGradient id="topRimGlow" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#fca67d"/>
+      <stop offset="50%" stop-color="#f9896b"/>
+      <stop offset="100%" stop-color="#f57065"/>
+    </linearGradient>
+
+    <!-- Lens Outer Ring -->
+    <linearGradient id="lensOuter" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5581b2"/>
+      <stop offset="50%" stop-color="#2c4c74"/>
+      <stop offset="100%" stop-color="#182d47"/>
+    </linearGradient>
+
+    <!-- Aperture Orange Ring (Top) -->
+    <linearGradient id="apertureOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffa059"/>
+      <stop offset="100%" stop-color="#f06c33"/>
+    </linearGradient>
+
+    <!-- Aperture Blue Ring (Bottom) -->
+    <linearGradient id="apertureBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#23426a"/>
+      <stop offset="100%" stop-color="#13243d"/>
+    </linearGradient>
+
+    <!-- X Bar 1 (Upper-left to bottom-right) -->
+    <linearGradient id="xBarBack" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#568bc7"/>
+      <stop offset="45%" stop-color="#3d6799"/>
+      <stop offset="70%" stop-color="#19283d"/>
+      <stop offset="100%" stop-color="#0f1926"/>
+    </linearGradient>
+
+    <!-- X Bar 2 Main Front Gradient (Top-right to bottom-left) -->
+    <linearGradient id="xBarFront" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fdbb8d"/>
+      <stop offset="40%" stop-color="#fb8b6b"/>
+      <stop offset="80%" stop-color="#f05b63"/>
+      <stop offset="100%" stop-color="#e3415c"/>
+    </linearGradient>
+
+    <!-- Drop Shadow Filters -->
+    <filter id="shadowPlate" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="shadowCam" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="shadowX" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-4" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+    <filter id="lensGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Base Plate (Dark Squircle) -->
+  <rect x="84" y="96" width="344" height="344" rx="76" ry="76" fill="url(#bgPlate)" filter="url(#shadowPlate)"/>
+
+  <!-- Camera Body Silhouette -->
+  <g filter="url(#shadowCam)">
+    <!-- Shutter Button Left -->
+    <rect x="118" y="116" width="48" height="24" rx="10" ry="10" fill="url(#camBody)"/>
+    <rect x="118" y="116" width="48" height="24" rx="10" ry="10" fill="url(#topRimGlow)" opacity="0.85"/>
+
+    <!-- Main Camera Housing with Pentaprism -->
+    <!-- Path: Top-left, up to prism, prism peak, down to right shoulder, down to bottom, round corners -->
+    <path d="M 124 134
+             C 102 134, 84 152, 84 174
+             L 84 340
+             C 84 362, 102 380, 124 380
+             L 336 380
+             C 358 380, 376 362, 376 340
+             L 376 174
+             C 376 152, 358 134, 336 134
+             L 310 134
+             C 300 134, 292 126, 286 116
+             L 278 100
+             C 272 88, 258 80, 244 80
+             L 216 80
+             C 202 80, 188 88, 182 100
+             L 174 116
+             C 168 126, 160 134, 150 134
+             Z"
+          fill="url(#camBody)"/>
+
+    <!-- Subtle Rim / Sunset Gradient on Top Edge of Body -->
+    <path d="M 124 134
+             C 102 134, 84 152, 84 174
+             L 84 260
+             C 110 240, 160 220, 210 240
+             C 260 260, 320 220, 376 200
+             L 376 174
+             C 376 152, 358 134, 336 134
+             L 310 134
+             C 300 134, 292 126, 286 116
+             L 278 100
+             C 272 88, 258 80, 244 80
+             L 216 80
+             C 202 80, 188 88, 182 100
+             L 174 116
+             C 168 126, 160 134, 150 134
+             Z"
+          fill="url(#topRimGlow)" opacity="0.32"/>
+
+    <!-- Flash Window (Small rounded rectangle on top-left) -->
+    <rect x="116" y="162" width="46" height="20" rx="9" fill="url(#topRimGlow)" opacity="0.8"/>
+
+    <!-- Glassmorphic Glow Orb on Left -->
+    <circle cx="160" cy="300" r="88" fill="#3b699c" opacity="0.35"/>
+  </g>
+
+  <!-- X Bar Behind Lens (Top-left to bottom-right leg) -->
+  <g>
+    <rect x="256" y="112" width="56" height="250" rx="28"
+          transform="rotate(-40 256 220)"
+          fill="url(#xBarBack)" opacity="0.95"/>
+  </g>
+
+  <!-- Central Camera Lens Assembly -->
+  <g filter="url(#lensGlow)">
+    <!-- Lens Outer Steel Bezel -->
+    <circle cx="236" cy="256" r="70" fill="url(#lensOuter)"/>
+
+    <!-- Outer Rim Inner Stroke -->
+    <circle cx="236" cy="256" r="66" fill="none" stroke="#6893c5" stroke-width="2" opacity="0.4"/>
+
+    <!-- Dual-Tone Aperture Ring -->
+    <!-- Top-Left Orange Arc -->
+    <path d="M 186 206 A 70 70 0 0 1 286 306 L 266 286 A 42 42 0 0 0 206 226 Z"
+          fill="url(#apertureOrange)"/>
+    <circle cx="236" cy="256" r="54" fill="url(#apertureOrange)"/>
+
+    <!-- Bottom-Right Dark Navy Sector -->
+    <path d="M 180 300 A 54 54 0 0 0 290 256 L 236 256 Z"
+          fill="url(#apertureBlue)"/>
+
+    <!-- Inner Aperture Ring -->
+    <circle cx="236" cy="256" r="42" fill="#14263e"/>
+    <circle cx="236" cy="256" r="32" fill="#0c1726"/>
+
+    <!-- Lens Specular Reflection (Bright Arc) -->
+    <path d="M 204 224 A 44 44 0 0 1 254 216" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="218" cy="232" r="4" fill="#ffffff" opacity="0.85"/>
+  </g>
+
+  <!-- Foreground Coral/Peach X Overlay (Top-Right to Bottom-Left) -->
+  <g filter="url(#shadowX)">
+    <!-- Dominant Glowing Coral X Bar -->
+    <rect x="330" y="90" width="60" height="280" rx="30"
+          transform="rotate(40 330 230)"
+          fill="url(#xBarFront)"/>
+  </g>
+</svg>

@@ -75,19 +75,8 @@ fun GXVViewfinderContainer(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val tactile = rememberTactileFeedback()
     val haptic = LocalHapticFeedback.current
-    val context = LocalContext.current
-
-    // Linear resonant actuator (LRA) hardware vibrator for Niagara Launcher style ratchet ticks
-    val vibrator = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            vm?.defaultVibrator ?: (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        }
-    }
 
     // Discrete 1/3 EV stops from +3.0 to -3.0 EV
     val evSteps = remember {
@@ -99,11 +88,7 @@ fun GXVViewfinderContainer(
     }
 
     fun triggerNiagaraTick() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && vibrator?.hasVibrator() == true) {
-            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-        } else {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        }
+        tactile.triggerTick()
     }
 
     // Tap-to-focus indicator & AE/AF Lock state

@@ -37,6 +37,8 @@ fun CameraSettingsBottomSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val tactile = rememberTactileFeedback()
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -300,7 +302,13 @@ fun CameraSettingsBottomSheet(
                 )
                 Slider(
                     value = settings.jpegQuality.toFloat(),
-                    onValueChange = { onUpdateSettings(settings.copy(jpegQuality = it.roundToInt())) },
+                    onValueChange = {
+                        val newQ = it.roundToInt()
+                        if (newQ != settings.jpegQuality) {
+                            tactile.triggerTick()
+                            onUpdateSettings(settings.copy(jpegQuality = newQ))
+                        }
+                    },
                     valueRange = 50f..100f,
                     steps = 49,
                     colors = SliderDefaults.colors(

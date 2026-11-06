@@ -40,7 +40,7 @@ fun ExpressiveLensSelector(
     isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val haptic = LocalHapticFeedback.current
+    val tactile = rememberTactileFeedback()
     var isDraggingSlider by remember { mutableStateOf(false) }
     var lastHapticStep by remember { mutableIntStateOf((currentZoomRatio * 10f).roundToInt()) }
 
@@ -89,7 +89,7 @@ fun ExpressiveLensSelector(
                         val newZoom = (currentZoomRatio + (delta / 80f)).coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM)
                         val step = (newZoom * 10f).roundToInt()
                         if (step != lastHapticStep) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            tactile.triggerTick()
                             lastHapticStep = step
                         }
                         onZoomChanged(newZoom)
@@ -126,7 +126,7 @@ fun ExpressiveLensSelector(
                                 if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                             )
                             .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                tactile.triggerSnap()
                                 onLensSelected(lens)
                             },
                         contentAlignment = Alignment.Center

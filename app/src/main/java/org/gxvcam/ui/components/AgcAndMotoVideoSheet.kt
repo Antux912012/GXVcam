@@ -12,14 +12,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import org.gxvcam.ui.state.*
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
 import org.gxvcam.ui.theme.GXVMotion
@@ -394,8 +394,13 @@ private fun PatcherSliderItem(
     valueRange: ClosedFloatingPointRange<Float>,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    displayFormat: String = "%.2f"
+    displayFormat: String = "%.2f",
+    tactile: TactileFeedbackController = rememberTactileFeedback()
 ) {
+    var lastTickStep by remember { mutableIntStateOf(0) }
+    val totalSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
+    val numSteps = 40
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -415,7 +420,14 @@ private fun PatcherSliderItem(
         }
         Slider(
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = { newVal ->
+                val currentStep = ((newVal - valueRange.start) / totalSpan * numSteps).roundToInt()
+                if (currentStep != lastTickStep) {
+                    tactile.triggerTick()
+                    lastTickStep = currentStep
+                }
+                onValueChange(newVal)
+            },
             valueRange = valueRange,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,

@@ -28,6 +28,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.roundToInt
 import org.gxvcam.camera.*
 import org.gxvcam.ui.theme.*
 
@@ -36,6 +37,9 @@ fun CameraScreen(
     controller: Camera2Controller,
     modifier: Modifier = Modifier
 ) {
+    val tactile = org.gxvcam.ui.components.rememberTactileFeedback()
+    var lastEvStep by remember { mutableIntStateOf(0) }
+    var lastShadowStep by remember { mutableIntStateOf(0) }
     val uiState by controller.uiState.collectAsState()
     val currentSensor by controller.currentSensor.collectAsState()
     val activeAuxButton by controller.activeAuxButton.collectAsState()
@@ -152,6 +156,11 @@ fun CameraScreen(
                 Slider(
                     value = exposureSliderValue,
                     onValueChange = {
+                        val step = (it * 3f).roundToInt()
+                        if (step != lastEvStep) {
+                            tactile.triggerTick()
+                            lastEvStep = step
+                        }
                         exposureSliderValue = it
                         controller.setExposureCompensation(it)
                     },
@@ -163,7 +172,14 @@ fun CameraScreen(
                 Icon(Icons.Default.BrightnessMedium, contentDescription = "Shadows", tint = Color.White, modifier = Modifier.size(18.dp))
                 Slider(
                     value = shadowSliderValue,
-                    onValueChange = { shadowSliderValue = it },
+                    onValueChange = {
+                        val step = (it * 10f).roundToInt()
+                        if (step != lastShadowStep) {
+                            tactile.triggerTick()
+                            lastShadowStep = step
+                        }
+                        shadowSliderValue = it
+                    },
                     valueRange = -1f..1f,
                     modifier = Modifier
                         .height(110.dp)

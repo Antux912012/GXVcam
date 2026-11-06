@@ -14,7 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -686,6 +686,9 @@ private fun EvSliderControl(
     evRange: IntRange,
     onEvChanged: (Int) -> Unit,
 ) {
+    val tactile = rememberTactileFeedback()
+    var lastIndex by remember { mutableIntStateOf(evIndex) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -694,7 +697,14 @@ private fun EvSliderControl(
         Text("-3 EV", fontSize = 10.sp, color = Color.Gray)
         Slider(
             value = evIndex.toFloat(),
-            onValueChange = { onEvChanged(it.roundToInt()) },
+            onValueChange = {
+                val newIdx = it.roundToInt()
+                if (newIdx != lastIndex) {
+                    tactile.triggerTick()
+                    lastIndex = newIdx
+                    onEvChanged(newIdx)
+                }
+            },
             valueRange = evRange.first.toFloat()..evRange.last.toFloat(),
             steps = ((evRange.last - evRange.first) - 1).coerceAtLeast(0),
             colors = SliderDefaults.colors(
@@ -714,6 +724,8 @@ private fun IsoSliderControl(
     isoRange: IntRange,
     onIsoChanged: (Int, Boolean) -> Unit,
 ) {
+    val tactile = rememberTactileFeedback()
+    var lastIsoStep by remember { mutableIntStateOf(currentIso) }
     val presets = listOf(100, 200, 400, 800, 1600, 3200, 6400)
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -752,7 +764,14 @@ private fun IsoSliderControl(
             Text("${isoRange.first}", fontSize = 10.sp, color = Color.Gray)
             Slider(
                 value = (if (isManual) currentIso else 100).toFloat().coerceIn(isoRange.first.toFloat(), isoRange.last.toFloat()),
-                onValueChange = { onIsoChanged(it.roundToInt(), true) },
+                onValueChange = {
+                    val newIso = it.roundToInt()
+                    if (kotlin.math.abs(newIso - lastIsoStep) >= 50) {
+                        tactile.triggerTick()
+                        lastIsoStep = newIso
+                    }
+                    onIsoChanged(newIso, true)
+                },
                 valueRange = isoRange.first.toFloat()..isoRange.last.toFloat(),
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,
@@ -828,6 +847,9 @@ private fun WhiteBalanceControl(
     currentKelvin: Int,
     onWbChanged: (WhiteBalanceMode, Int) -> Unit,
 ) {
+    val tactile = rememberTactileFeedback()
+    var lastK by remember { mutableIntStateOf(currentKelvin) }
+
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier
@@ -856,7 +878,14 @@ private fun WhiteBalanceControl(
             Text("2500K", fontSize = 10.sp, color = Color.Gray)
             Slider(
                 value = currentKelvin.toFloat().coerceIn(2500f, 9000f),
-                onValueChange = { onWbChanged(WhiteBalanceMode.CUSTOM, it.roundToInt()) },
+                onValueChange = {
+                    val newK = it.roundToInt()
+                    if (kotlin.math.abs(newK - lastK) >= 100) {
+                        tactile.triggerTick()
+                        lastK = newK
+                    }
+                    onWbChanged(WhiteBalanceMode.CUSTOM, newK)
+                },
                 valueRange = 2500f..9000f,
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,
@@ -876,6 +905,9 @@ private fun FocusControl(
     maxDistance: Float,
     onFocusChanged: (Float, Boolean) -> Unit,
 ) {
+    val tactile = rememberTactileFeedback()
+    var lastStep by remember { mutableIntStateOf(0) }
+
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -915,7 +947,14 @@ private fun FocusControl(
             Text("∞", fontSize = 12.sp, color = Color.Gray)
             Slider(
                 value = currentDistance.coerceIn(0f, maxDistance),
-                onValueChange = { onFocusChanged(it, true) },
+                onValueChange = {
+                    val step = (it / maxDistance.coerceAtLeast(0.001f) * 30f).roundToInt()
+                    if (step != lastStep) {
+                        tactile.triggerTick()
+                        lastStep = step
+                    }
+                    onFocusChanged(it, true)
+                },
                 valueRange = 0f..maxDistance,
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,

@@ -56,8 +56,11 @@ class Camera2Controller(private val context: Context) {
     var isProMode = false
     var isUltraRes50M = false
     var manualIso: Int? = null // null = Auto, or 100..19200
+        private set
     var manualExposureNs: Long? = null // null = Auto, or up to 32,000,000,000ns (32s)
+        private set
     var manualFocusDist: Float? = null // null = Auto, 0.0f = Infinity, 10.0f = Macro
+        private set
 
     private var previewSurface: Surface? = null
 
@@ -210,8 +213,23 @@ class Camera2Controller(private val context: Context) {
         )
     }
 
+    private fun <T> CaptureRequest.Builder.setSafe(key: CaptureRequest.Key<T>?, value: T) {
+        if (key == null) return
+        try {
+            set(key, value)
+        } catch (e: IllegalArgumentException) {
+            Log.d(TAG, "Tag not supported by HAL: ${key.name}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to set tag ${key.name}: ${e.message}")
+        }
+    }
+
     private fun startPreview(session: CameraCaptureSession, previewSurface: Surface) {
         val device = cameraDevice ?: return
+        if (!previewSurface.isValid) {
+            Log.e(TAG, "Failed to start preview: surface is not valid")
+            return
+        }
         try {
             val previewRequestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                 addTarget(previewSurface)
@@ -220,6 +238,7 @@ class Camera2Controller(private val context: Context) {
 
             session.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler)
             _uiState.value = CameraUiState.Ready
+            Log.i(TAG, "Camera preview repeating request successfully started")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start preview: ${e.message}", e)
             _uiState.value = CameraUiState.Error("Preview error: ${e.message}")
@@ -258,6 +277,21 @@ class Camera2Controller(private val context: Context) {
             builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
         }
 
+        // Apply Exposure Compensation
+        if (currentEv != 0f) {
+            try {
+                val characteristics = cameraManager.getCameraCharacteristics(_currentSensor.value.cameraId)
+                val range = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+                val step = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+                if (range != null && step != null && step.toFloat() > 0f) {
+                    val index = (currentEv / step.toFloat()).toInt().coerceIn(range.lower, range.upper)
+                    builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, index)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to set exposure compensation: ${e.message}")
+            }
+        }
+
         // Apply Pro Manual Controls
         if (isProMode) {
             if (manualIso != null || manualExposureNs != null) {
@@ -276,11 +310,11 @@ class Camera2Controller(private val context: Context) {
             builder.set(CaptureRequest.CONTROL_ZOOM_RATIO, currentZoomRatio)
         }
 
-        // Apply MediaTek & Motorola Vendor Tags
-        MtkMotoVendorTags.MTK_ZSL_MODE?.let { key -> builder.set(key, 1) }
-        MtkMotoVendorTags.MOTO_ZSL_MODE?.let { key -> builder.set(key, 1) }
+        // Apply MediaTek & Motorola Vendor Tags safely
+        builder.setSafe(MtkMotoVendorTags.MTK_ZSL_MODE, 1)
+        builder.setSafe(MtkMotoVendorTags.MOTO_ZSL_MODE, 1)
         if (isUltraRes50M) {
-            MtkMotoVendorTags.MOTO_DO_REMOSAIC?.let { key -> builder.set(key, 1) }
+            builder.setSafe(MtkMotoVendorTags.MOTO_DO_REMOSAIC, 1)
         }
     }
 
@@ -300,9 +334,9 @@ class Camera2Controller(private val context: Context) {
 
                 // Inject MediaTek vendor tags for burst / ISP tuning
                 val burstCount = if (hdrMode == "HDR_ENHANCED") 12 else 8
-                MtkMotoVendorTags.MTK_ISP_FRAME_COUNT?.let { set(it, burstCount) }
-                MtkMotoVendorTags.MTK_ISP_FRAME_INDEX?.let { set(it, 0) }
-                MtkMotoVendorTags.MOTO_ADRC_ENABLE?.let { set(it, 1) }
+                setSafe(MtkMotoVendorTags.MTK_ISP_FRAME_COUNT, burstCount)
+                setSafe(MtkMotoVendorTags.MTK_ISP_FRAME_INDEX, 0)
+                setSafe(MtkMotoVendorTags.MOTO_ADRC_ENABLE, 1)
             }
 
             session.capture(

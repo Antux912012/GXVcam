@@ -63,6 +63,12 @@ object MtkMotoVendorTags {
     val MOTO_DO_REMOSAIC: CaptureRequest.Key<Int>? =
         createRequestKey("com.lenovo.moto.quadra_cfa.do_remosaic", Int::class.javaPrimitiveType)
 
+    val MOTO_TINTLESS_ENABLE: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.tintless.enable", Int::class.javaPrimitiveType)
+
+    val MOTO_IN_SENSOR_CROP_ENABLE: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.in_sensor_crop.enable", Int::class.javaPrimitiveType)
+
     // Static Characteristics Keys
     val MOTO_VENDOR_EXPOSURE_RANGE: CameraCharacteristics.Key<LongArray>? =
         createCharacteristicKey("com.lenovo.moto.sensor.info.exposureTimeRange", LongArray::class.java)
@@ -71,22 +77,24 @@ object MtkMotoVendorTags {
         createCharacteristicKey("com.lenovo.moto.quadra_cfa.is_remosaic_by_hw", Int::class.javaPrimitiveType)
 
     // Helper functions
+    @Suppress("UNCHECKED_CAST")
     private fun <T> createRequestKey(name: String, type: Class<T>?): CaptureRequest.Key<T>? {
         return try {
             val constructor = CaptureRequest.Key::class.java.getDeclaredConstructor(String::class.java, Class::class.java)
             constructor.isAccessible = true
-            constructor.newInstance(name, type)
+            constructor.newInstance(name, type) as? CaptureRequest.Key<T>
         } catch (e: Exception) {
             Log.d(TAG, "Key $name not available: ${e.message}")
             null
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun <T> createCharacteristicKey(name: String, type: Class<T>?): CameraCharacteristics.Key<T>? {
         return try {
             val constructor = CameraCharacteristics.Key::class.java.getDeclaredConstructor(String::class.java, Class::class.java)
             constructor.isAccessible = true
-            constructor.newInstance(name, type)
+            constructor.newInstance(name, type) as? CameraCharacteristics.Key<T>
         } catch (e: Exception) {
             Log.d(TAG, "Characteristic Key $name not available: ${e.message}")
             null

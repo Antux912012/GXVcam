@@ -83,7 +83,6 @@ fun CameraScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     focusRingOffset = Pair(offset.x, offset.y)
@@ -388,7 +387,7 @@ fun CameraScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (btn.label == ".6") ".5" else btn.label, // Moto style uses .5
+                            text = btn.label,
                             color = if (isSelected) AccentTeal else Color.White,
                             fontSize = 12.sp,
                             style = MaterialTheme.typography.labelMedium

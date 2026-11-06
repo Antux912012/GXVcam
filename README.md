@@ -12,16 +12,20 @@ and **Edge 60 Neo** (Dimensity 7400, Android 15/16):
 
 See [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) for the limits on reusing GCam/vivo.
 
-## Status
+## Download & Releases
 
-| Area | State |
-| :--- | :--- |
-| Architecture & docs | ✅ Reviewed & updated for Android 16 (SDK 36) |
-| Device probe tool (`tools/mtk_camera_probe.py`) | ✅ **Verified on physical Motorola Edge 50 Neo** (ZY22LWCQSB) |
-| RAW unpack + black level (CPU reference) | ✅ Implemented + host unit test |
-| RAW10/16 unpack (Vulkan shader) | ✅ Written + 16KB page-size alignment configured |
-| Android/Gradle project | ⏳ Phase 0 |
-| Capture, fusion, look, UI | ⏳ |
+Pre-built APKs are available under GitHub Releases:
+* [**Download latest GXVcam APK (v0.2.0)**](https://github.com/Antux912012/GXVcam/releases/download/v0.2.0/GXVcam-v0.2.0.apk)
+
+## Features & Status
+
+| Area | State | Highlights |
+| :--- | :--- | :--- |
+| **Multi-Camera & Aux Sensors** | ✅ Verified on Edge 50 Neo | Bypasses `vendor.camera.aux.packagelist` to expose & bind Camera 0 (Main 50MP Sony IMX896), Camera 2 (13MP GalaxyCore GC13A2 Ultra-Wide 0.6x), Camera 3 (10MP Samsung S5K3K1 Telephoto 3x), and Camera 5 (Logical multi-camera) |
+| **M3 Expressive PRO Mode** | ✅ Complete & De-cluttered | Live parameter readout, instant AUTO reset per parameter & global RESET ALL, quick-stop chips (ISO 100–6400, Shutter 1/4000s–32s, White Balance modes + Kelvin slider, AF-C / Macro / Infinity) |
+| **MotCamera5 & GCam Settings** | ✅ Implemented | 50MP Quad-Bayer remosaic, ADRC dynamic range, Tintless lens shading, ZSL, Super Night, Anti-banding, RAW+JPEG DNG, Burst HDR+ frame count, Gyro Horizon level, RGB Histogram |
+| **BigKaka AGC LibPatcher** | ✅ Implemented | Zeiss Natural, Leica Authentic, Leica Vibrant, Vivo Vivid, and Custom profiles with live viewfinder LUT (RenderEffect) |
+| **Vulkan & RAW Pipeline** | ✅ Implemented | 16-bit RAW_SENSOR unpacker with Vulkan compute shader and CPU reference |
 
 ## Layout
 

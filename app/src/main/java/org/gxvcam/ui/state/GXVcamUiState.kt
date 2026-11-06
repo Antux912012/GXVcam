@@ -350,6 +350,12 @@ enum class AccentTheme(
     MINT_EXPRESSIVE("Expressive Mint", "M3 Expressive teal mint", 0xFF30D158, 0xFF0D421D),
 }
 
+enum class VolumeKeyAction(val label: String, val shortLabel: String, val description: String) {
+    ZOOM("Zoom In / Out", "Zoom", "Volume Up zooms in, Volume Down zooms out with cinema curve"),
+    SHUTTER("Shutter / Record", "Shutter", "Volume buttons capture photo or start/stop video"),
+    VOLUME("System Volume", "Volume", "Volume buttons control device system audio volume")
+}
+
 @Immutable
 data class CameraManualSettings(
     val isUltraRes50M: Boolean = false,
@@ -372,6 +378,7 @@ data class CameraManualSettings(
     val gridType: GridType = GridType.RULE_OF_THIRDS,
     val proLayoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
     val accentTheme: AccentTheme = AccentTheme.DYNAMIC_SYSTEM,
+    val volumeKeyAction: VolumeKeyAction = VolumeKeyAction.ZOOM,
 )
 
 @Immutable
@@ -524,4 +531,9 @@ sealed interface GXVcamEvent {
     data class SetPortraitApertureExpanded(val expanded: Boolean) : GXVcamEvent
     data object ToggleMacroLock : GXVcamEvent
     data object ToggleAutoNightVision : GXVcamEvent
+
+    // Cinema Camera Hardware Volume Zoom Events
+    data class OnVolumeZoomStep(val isZoomIn: Boolean) : GXVcamEvent
+    data class OnVolumeZoomHold(val isZoomIn: Boolean) : GXVcamEvent
+    data object OnVolumeZoomReleased : GXVcamEvent
 }

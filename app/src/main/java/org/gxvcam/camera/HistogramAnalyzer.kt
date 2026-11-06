@@ -13,6 +13,17 @@ class HistogramAnalyzer(
     private var lastUpdateNs: Long = 0L
     private val frameIntervalNs: Long = 50_000_000L // Throttled to 20 FPS (50ms) to conserve CPU
 
+    // Pre-allocated bin count and normalized arrays to eliminate per-frame GC churn
+    private val rCounts = IntArray(256)
+    private val gCounts = IntArray(256)
+    private val bCounts = IntArray(256)
+    private val lumaCounts = IntArray(256)
+
+    private val rNorm = FloatArray(256)
+    private val gNorm = FloatArray(256)
+    private val bNorm = FloatArray(256)
+    private val yNorm = FloatArray(256)
+
     override fun analyze(image: ImageProxy) {
         val now = System.nanoTime()
         if (now - lastUpdateNs < frameIntervalNs) {
@@ -38,10 +49,10 @@ class HistogramAnalyzer(
             val uvRowStride = uPlane.rowStride
             val uvPixelStride = uPlane.pixelStride
 
-            val rCounts = IntArray(256)
-            val gCounts = IntArray(256)
-            val bCounts = IntArray(256)
-            val lumaCounts = IntArray(256)
+            rCounts.fill(0)
+            gCounts.fill(0)
+            bCounts.fill(0)
+            lumaCounts.fill(0)
 
             val step = 8 // Subsample every 8th pixel in X and Y
 
@@ -76,12 +87,14 @@ class HistogramAnalyzer(
             val maxB = max(1, bCounts.maxOrNull() ?: 1)
             val maxY = max(1, lumaCounts.maxOrNull() ?: 1)
 
-            val rNorm = FloatArray(256) { rCounts[it].toFloat() / maxR }
-            val gNorm = FloatArray(256) { gCounts[it].toFloat() / maxG }
-            val bNorm = FloatArray(256) { bCounts[it].toFloat() / maxB }
-            val yNorm = FloatArray(256) { lumaCounts[it].toFloat() / maxY }
+            for (i in 0 until 256) {
+                rNorm[i] = rCounts[i].toFloat() / maxR
+                gNorm[i] = gCounts[i].toFloat() / maxG
+                bNorm[i] = bCounts[i].toFloat() / maxB
+                yNorm[i] = lumaCounts[i].toFloat() / maxY
+            }
 
-            onHistogramComputed(HistogramData(rNorm, gNorm, bNorm, yNorm))
+            onHistogramComputed(HistogramData(rNorm.clone(), gNorm.clone(), bNorm.clone(), yNorm.clone()))
         } catch (_: Exception) {
             // Ignore frame decode exceptions on closed image
         } finally {

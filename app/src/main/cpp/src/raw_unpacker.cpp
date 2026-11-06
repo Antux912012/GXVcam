@@ -17,7 +17,7 @@ inline float normalize(uint32_t v, float bl, float wl) {
 }
 
 bool geometry_ok(const FrameMetadata& m, size_t src_size, size_t min_row_bytes) {
-    if (m.width <= 0 || m.height <= 0) return false;
+    if (m.width <= 0 || m.height <= 0 || m.row_stride_bytes <= 0) return false;
     if (static_cast<size_t>(m.row_stride_bytes) < min_row_bytes) return false;
     // Last row only needs min_row_bytes, not the full stride.
     const size_t needed =

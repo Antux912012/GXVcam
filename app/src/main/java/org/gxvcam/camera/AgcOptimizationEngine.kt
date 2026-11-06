@@ -19,7 +19,11 @@ object AgcOptimizationEngine {
 
         fun <T : Any> setIfSupported(key: CaptureRequest.Key<T>?, value: T) {
             if (key != null && (supportedKeys.isEmpty() || supportedKeys.contains(key.name))) {
-                builder.setCaptureRequestOption(key, value)
+                try {
+                    builder.setCaptureRequestOption(key, value)
+                } catch (_: IllegalArgumentException) {
+                    // Ignored on HAL implementations lacking this vendor tag
+                }
             }
         }
 

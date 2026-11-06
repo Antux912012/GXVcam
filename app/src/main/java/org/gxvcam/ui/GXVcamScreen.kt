@@ -112,6 +112,7 @@ fun GXVcamScreenContent(
             showHorizon = uiState.manualSettings.isHorizonLevelVisible,
             levelHorizonDegrees = uiState.levelHorizonDegrees,
             currentZoom = uiState.currentZoomRatio,
+            isBackCamera = uiState.isBackCamera,
             isAeLocked = uiState.isAeLocked,
             isAfLocked = uiState.isAfLocked,
             isAeAfLocked = uiState.isAeAfLocked,
@@ -419,7 +420,7 @@ fun GXVcamScreenContent(
 
 
             // M3 Expressive Lens Pill Selector or Motorola 4-Prime Portrait Deck
-            if (uiState.currentMode == CameraMode.PORTRAIT) {
+            if (uiState.currentMode == CameraMode.PORTRAIT && uiState.isBackCamera) {
                 MotoPortraitDeck(
                     activeLens = uiState.activePortraitLens,
                     aperture = uiState.portraitAperture,
@@ -435,9 +436,11 @@ fun GXVcamScreenContent(
                     currentZoomRatio = uiState.currentZoomRatio,
                     onLensSelected = { onEvent(GXVcamEvent.OnLensSelected(it)) },
                     onZoomChanged = { onEvent(GXVcamEvent.OnZoomChanged(it)) },
+                    onZoomStep = { onEvent(GXVcamEvent.SetZoomRatio(it)) },
                     isExpanded = uiState.isZoomSliderExpanded,
                     onExpandedChange = { onEvent(GXVcamEvent.SetZoomSliderExpanded(it)) },
-                    isFull = isFull
+                    isFull = isFull,
+                    isBackCamera = uiState.isBackCamera
                 )
             }
 

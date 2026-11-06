@@ -62,6 +62,9 @@ import org.gxvcam.ui.state.SonyAeMode
 import org.gxvcam.ui.state.SonyAfMode
 import org.gxvcam.ui.state.VideoResolution
 import org.gxvcam.ui.state.WhiteBalanceMode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -155,6 +158,7 @@ class GXVcamController(
 
     private var activeRecording: Recording? = null
     private var lastWasDualCapture: Boolean = false
+    private val inFlightCaptures = java.util.concurrent.atomic.AtomicInteger(0)
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var pendingBindRunnable: Runnable? = null
 
@@ -168,6 +172,8 @@ class GXVcamController(
 
     var onCapabilitiesReady: ((ProHardwareCapabilities) -> Unit)? = null
     var onHistogramReady: ((HistogramData) -> Unit)? = null
+    var hardwareCapabilities: ProHardwareCapabilities = ProHardwareCapabilities()
+        private set
 
     init {
         updateVideoCapture(currentVideoSettings)
@@ -558,6 +564,7 @@ class GXVcamController(
                 minFocusDistanceDiopters = minFocusDist,
                 isRawSupported = isRawSupported
             )
+            this.hardwareCapabilities = capabilities
 
             onCapabilitiesReady?.invoke(capabilities)
             onEvent?.invoke(GXVcamEvent.UpdateHardwareCapabilities(capabilities))
@@ -569,7 +576,11 @@ class GXVcamController(
     @OptIn(ExperimentalCamera2Interop::class)
     private fun <T : Any> CaptureRequestOptions.Builder.setIfSupported(key: CaptureRequest.Key<T>?, value: T) {
         if (key != null && (supportedRequestKeyNames.isEmpty() || supportedRequestKeyNames.contains(key.name))) {
-            setCaptureRequestOption(key, value)
+            try {
+                setCaptureRequestOption(key, value)
+            } catch (_: IllegalArgumentException) {
+                // Key not supported by current Camera2 HAL
+            }
         }
     }
 
@@ -809,7 +820,8 @@ class GXVcamController(
         try {
             val control2 = Camera2CameraControl.from(cam.cameraControl)
             val builder = CaptureRequestOptions.Builder()
-            MotoVideoEngine.applyVideoInterop(builder, settings, zoomRatio, rollDegrees, supportedRequestKeyNames)
+            val hasOis = (currentActiveLens != OpticalLens.UW)
+            MotoVideoEngine.applyVideoInterop(builder, settings, zoomRatio, rollDegrees, supportedRequestKeyNames, hasOis)
             control2.addCaptureRequestOptions(builder.build())
         } catch (e: Exception) {
             Log.w(TAG, "Error applying Moto video settings: ${e.message}")
@@ -821,10 +833,15 @@ class GXVcamController(
         val cam = camera ?: return
         try {
             val control2 = Camera2CameraControl.from(cam.cameraControl)
+            val oisMode = if (lastBindConfig?.isBackCamera == true && currentActiveLens != OpticalLens.UW) {
+                CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
+            } else {
+                CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
+            }
             val builder = CaptureRequestOptions.Builder()
                 .setCaptureRequestOption(
                     CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
+                    oisMode
                 )
                 .setCaptureRequestOption(
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
@@ -1062,6 +1079,12 @@ class GXVcamController(
             return
         }
 
+        if (inFlightCaptures.get() >= 2) {
+            Log.w(TAG, "capturePhoto dropped: pipeline saturated (${inFlightCaptures.get()} in-flight captures)")
+            return
+        }
+        inFlightCaptures.incrementAndGet()
+
         val profile = currentAgcSettings.activeProfile
         val lens = currentActiveLens
         val agc = currentAgcSettings
@@ -1084,113 +1107,130 @@ class GXVcamController(
             cameraExecutor,
             object : ImageCapture.OnImageCapturedCallback() {
                 override fun onCaptureSuccess(image: ImageProxy) {
-                    try {
-                        val buffer = image.planes[0].buffer
-                        val bytes = ByteArray(buffer.remaining())
-                        buffer.get(bytes)
-                        val rotationDegrees = image.imageInfo.rotationDegrees
-                        image.close()
+                    val (bytes, rotationDegrees) = try {
+                        image.use { img ->
+                            val buffer = img.planes[0].buffer
+                            val b = ByteArray(buffer.remaining())
+                            buffer.get(b)
+                            Pair(b, img.imageInfo.rotationDegrees)
+                        }
+                    } catch (e: Exception) {
+                        inFlightCaptures.decrementAndGet()
+                        Log.e(TAG, "Failed to read image buffer from proxy: ${e.message}", e)
+                        return
+                    }
 
-                        val timestamp = System.currentTimeMillis()
-                        var dngUri: android.net.Uri? = null
-                        var jpegUri: android.net.Uri? = null
+                    // Offload heavy image enhancement and MediaStore disk I/O to IO thread
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val timestamp = System.currentTimeMillis()
+                            var dngUri: android.net.Uri? = null
+                            var jpegUri: android.net.Uri? = null
 
-                        // 1. RAW / DNG Digital Negative Capture (if format is RAW or RAW_AND_JPEG)
-                        if (format.isRaw) {
-                            try {
-                                val dngValues = ContentValues().apply {
-                                    put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_$timestamp.dng")
-                                    put(MediaStore.MediaColumns.MIME_TYPE, "image/x-adobe-dng")
+                            // 1. RAW / DNG Digital Negative Capture (if format is RAW or RAW_AND_JPEG)
+                            if (format.isRaw) {
+                                if (hardwareCapabilities.isRawSupported) {
+                                    try {
+                                        val dngValues = ContentValues().apply {
+                                            put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_$timestamp.dng")
+                                            put(MediaStore.MediaColumns.MIME_TYPE, "image/x-adobe-dng")
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/GXVcam")
+                                                put(MediaStore.Images.Media.IS_PENDING, 1)
+                                            }
+                                        }
+                                        dngUri = context.contentResolver.insert(
+                                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                            dngValues
+                                        )
+                                        if (dngUri != null) {
+                                            context.contentResolver.openOutputStream(dngUri)?.use { out ->
+                                                out.write(bytes)
+                                                out.flush()
+                                            }
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                val updateValues = ContentValues().apply {
+                                                    put(MediaStore.Images.Media.IS_PENDING, 0)
+                                                }
+                                                context.contentResolver.update(dngUri, updateValues, null, null)
+                                            }
+                                            Log.i(TAG, "RAW DNG saved to $dngUri (${bytes.size} bytes)")
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Error saving RAW DNG file: ${e.message}")
+                                    }
+                                } else {
+                                    Log.w(TAG, "RAW capture requested but sensor does not support REQUEST_AVAILABLE_CAPABILITIES_RAW")
+                                }
+                            }
+
+                            // 2. Processed JPEG Capture (if format is JPEG or RAW_AND_JPEG)
+                            if (format.isJpeg) {
+                                val isPortrait = lastBindConfig?.cameraMode == CameraMode.PORTRAIT || currentCameraMode == CameraMode.PORTRAIT
+                                val processed = GXVImageProcessor.processJpeg(
+                                    inputJpeg = bytes,
+                                    profile = profile,
+                                    activeLens = lens,
+                                    customSettings = agc,
+                                    aspectRatio = ratio,
+                                    colorSpace = colorSpace,
+                                    jpegQuality = jpegQuality,
+                                    rotationDegrees = rotationDegrees,
+                                    secondaryBitmap = secBitmap,
+                                    dualCaptureLayout = currentVideoSettings.dualCaptureLayout,
+                                    isDualCaptureSwapped = currentVideoSettings.isDualCaptureSwapped,
+                                    isPortraitMode = isPortrait,
+                                    portraitAperture = portraitAperture,
+                                    watermarkStyle = currentManualSettings.watermarkStyle,
+                                    watermarkSignature = currentManualSettings.watermarkSignature
+                                )
+
+                                val contentValues = ContentValues().apply {
+                                    put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_$timestamp.jpg")
+                                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                         put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/GXVcam")
                                         put(MediaStore.Images.Media.IS_PENDING, 1)
                                     }
                                 }
-                                dngUri = context.contentResolver.insert(
+                                jpegUri = context.contentResolver.insert(
                                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                    dngValues
+                                    contentValues
                                 )
-                                if (dngUri != null) {
-                                    context.contentResolver.openOutputStream(dngUri)?.use { out ->
-                                        out.write(bytes)
+
+                                if (jpegUri != null) {
+                                    context.contentResolver.openOutputStream(jpegUri)?.use { out ->
+                                        out.write(processed)
                                         out.flush()
                                     }
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                         val updateValues = ContentValues().apply {
                                             put(MediaStore.Images.Media.IS_PENDING, 0)
                                         }
-                                        context.contentResolver.update(dngUri, updateValues, null, null)
+                                        context.contentResolver.update(jpegUri, updateValues, null, null)
                                     }
-                                    Log.i(TAG, "16-bit RAW DNG saved to $dngUri (${bytes.size} bytes)")
+
+                                    Log.i(TAG, "Enhanced photo saved to $jpegUri (${processed.size} bytes, profile: ${profile.label}, colorSpace: ${colorSpace.label}, Q=${jpegQuality}%)")
                                 }
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Error saving RAW DNG file: ${e.message}")
                             }
+
+                            // Notify UI with the appropriate URI
+                            val primaryUri = if (format == org.gxvcam.ui.state.CaptureFormat.RAW) dngUri else (jpegUri ?: dngUri)
+                            if (primaryUri != null) {
+                                ContextCompat.getMainExecutor(context).execute {
+                                    onEvent?.invoke(GXVcamEvent.OnPhotoCaptured(primaryUri))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in photo processing pipeline: ${e.message}", e)
+                        } finally {
+                            inFlightCaptures.decrementAndGet()
                         }
-
-                        // 2. Processed JPEG Capture (if format is JPEG or RAW_AND_JPEG)
-                        if (format.isJpeg) {
-                            val isPortrait = lastBindConfig?.cameraMode == CameraMode.PORTRAIT || currentCameraMode == CameraMode.PORTRAIT
-                            val processed = GXVImageProcessor.processJpeg(
-                                inputJpeg = bytes,
-                                profile = profile,
-                                activeLens = lens,
-                                customSettings = agc,
-                                aspectRatio = ratio,
-                                colorSpace = colorSpace,
-                                jpegQuality = jpegQuality,
-                                rotationDegrees = rotationDegrees,
-                                secondaryBitmap = secBitmap,
-                                dualCaptureLayout = currentVideoSettings.dualCaptureLayout,
-                                isDualCaptureSwapped = currentVideoSettings.isDualCaptureSwapped,
-                                isPortraitMode = isPortrait,
-                                portraitAperture = portraitAperture,
-                                watermarkStyle = currentManualSettings.watermarkStyle,
-                                watermarkSignature = currentManualSettings.watermarkSignature
-                            )
-
-                            val contentValues = ContentValues().apply {
-                                put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_$timestamp.jpg")
-                                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    put(MediaStore.Images.Media.RELATIVE_PATH, "DCIM/GXVcam")
-                                    put(MediaStore.Images.Media.IS_PENDING, 1)
-                                }
-                            }
-                            jpegUri = context.contentResolver.insert(
-                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                contentValues
-                            )
-
-                            if (jpegUri != null) {
-                                context.contentResolver.openOutputStream(jpegUri)?.use { out ->
-                                    out.write(processed)
-                                    out.flush()
-                                }
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    val updateValues = ContentValues().apply {
-                                        put(MediaStore.Images.Media.IS_PENDING, 0)
-                                    }
-                                    context.contentResolver.update(jpegUri, updateValues, null, null)
-                                }
-
-                                Log.i(TAG, "Enhanced photo saved to $jpegUri (${processed.size} bytes, profile: ${profile.label}, colorSpace: ${colorSpace.label}, Q=${jpegQuality}%)")
-                            }
-                        }
-
-                        // Notify UI with the appropriate URI
-                        val primaryUri = if (format == org.gxvcam.ui.state.CaptureFormat.RAW) dngUri else (jpegUri ?: dngUri)
-                        if (primaryUri != null) {
-                            ContextCompat.getMainExecutor(context).execute {
-                                onEvent?.invoke(GXVcamEvent.OnPhotoCaptured(primaryUri))
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error in photo processing pipeline: ${e.message}", e)
                     }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
+                    inFlightCaptures.decrementAndGet()
                     Log.e(TAG, "Photo capture failed: ${exception.message}", exception)
                 }
             }

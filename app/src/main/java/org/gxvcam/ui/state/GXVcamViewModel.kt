@@ -86,14 +86,26 @@ class GXVcamViewModel : ViewModel() {
 
             is GXVcamEvent.SetZoomRatio -> {
                 _uiState.update { it.copy(isMacroLocked = false) }
-                handleZoomChanged(event.zoom)
+                smoothAnimateZoomTo(event.zoom)
             }
             is GXVcamEvent.OnZoomChanged -> {
+                zoomAnimationJob?.cancel()
                 _uiState.update { it.copy(isMacroLocked = false) }
                 handleZoomChanged(event.zoomRatio)
             }
             is GXVcamEvent.SetZoomSliderExpanded -> {
                 _uiState.update { it.copy(isZoomSliderExpanded = event.expanded) }
+            }
+
+            // Cinema Camera Hardware Volume Zoom Events
+            is GXVcamEvent.OnVolumeZoomHold -> {
+                startVolumeZoom(event.isZoomIn)
+            }
+            is GXVcamEvent.OnVolumeZoomStep -> {
+                animateToNextZoomStop(event.isZoomIn)
+            }
+            is GXVcamEvent.OnVolumeZoomReleased -> {
+                stopVolumeZoom()
             }
 
             is GXVcamEvent.ToggleCameraFacing -> handleFlipCamera()
@@ -510,37 +522,163 @@ class GXVcamViewModel : ViewModel() {
         }
     }
 
+    // Cinema-Grade Logarithmic Zoom Engine
+    private var volumeZoomJob: Job? = null
+    private var volumeKeyDownTime: Long = 0L
+    private var volumeZoomIsZoomIn: Boolean = true
+    private var zoomAnimationJob: Job? = null
+
     private fun handleLensSelected(lens: OpticalLens) {
         _uiState.update {
             it.copy(
-                activeLens = lens,
-                currentZoomRatio = lens.zoomRatio
+                isMacroLocked = false
             )
         }
-        controller?.setLens(lens)
+        smoothAnimateZoomTo(lens.zoomRatio)
     }
 
     private fun handleZoomChanged(zoom: Float) {
-        val clamped = zoom.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM)
+        val isBack = _uiState.value.isBackCamera
+        val minZoom = if (isBack) OpticalLens.MIN_ZOOM else 1.0f
+        val maxZoom = if (isBack) OpticalLens.MAX_ZOOM else 4.0f
+        val clamped = zoom.coerceIn(minZoom, maxZoom)
         val targetLens = OpticalLens.forZoom(clamped)
-        val previousLens = _uiState.value.activeLens
         _uiState.update {
             it.copy(
                 currentZoomRatio = clamped,
                 activeLens = targetLens
             )
         }
-        if (targetLens != previousLens) {
-            controller?.setLens(targetLens, clamped)
+        controller?.setZoom(clamped)
+    }
+
+    fun startVolumeZoom(isZoomIn: Boolean) {
+        volumeKeyDownTime = System.currentTimeMillis()
+        volumeZoomIsZoomIn = isZoomIn
+        zoomAnimationJob?.cancel()
+        volumeZoomJob?.cancel()
+        volumeZoomJob = viewModelScope.launch {
+            val isBack = _uiState.value.isBackCamera
+            val minZoom = if (isBack) OpticalLens.MIN_ZOOM else 1.0f
+            val maxZoom = if (isBack) OpticalLens.MAX_ZOOM else 4.0f
+            val startTime = System.currentTimeMillis()
+            var currentVelocity = 0.0f
+            // Logarithmic speed (d ln(zoom) / dt). 0.72 gives smooth cinema zoom ramping
+            val targetVelocity = if (isZoomIn) 0.72f else -0.72f
+
+            while (isActive) {
+                val now = System.currentTimeMillis()
+                val elapsedHoldMs = now - startTime
+
+                // Ease-in velocity ramp over 180ms
+                val rampFactor = (elapsedHoldMs / 180f).coerceIn(0.12f, 1.0f)
+                currentVelocity = targetVelocity * rampFactor
+
+                val currentZ = _uiState.value.currentZoomRatio
+                val dt = 0.016f // 16ms = ~60 FPS
+                val nextZ = (currentZ * kotlin.math.exp(currentVelocity * dt)).coerceIn(
+                    minZoom,
+                    maxZoom
+                )
+
+                handleZoomChanged(nextZ)
+
+                if ((isZoomIn && nextZ >= maxZoom) || (!isZoomIn && nextZ <= minZoom)) {
+                    break
+                }
+                delay(16)
+            }
+        }
+    }
+
+    fun stopVolumeZoom() {
+        val holdDuration = System.currentTimeMillis() - volumeKeyDownTime
+        volumeZoomJob?.cancel()
+        volumeZoomJob = null
+
+        // If tap was quick (< 180ms), step smoothly to next natural cinema stop
+        if (holdDuration < 180L) {
+            animateToNextZoomStop(volumeZoomIsZoomIn)
+        }
+    }
+
+    fun animateToNextZoomStop(isZoomIn: Boolean) {
+        val isBack = _uiState.value.isBackCamera
+        val stops = if (isBack) {
+            listOf(0.6f, 1.0f, 1.2f, 1.5f, 2.0f, 3.0f, 5.0f, 10.0f, 20.0f)
         } else {
-            controller?.setZoom(clamped)
+            listOf(1.0f, 1.4f)
+        }
+        val current = _uiState.value.currentZoomRatio
+        val target = if (isZoomIn) {
+            stops.firstOrNull { it > current + 0.05f } ?: (if (isBack) OpticalLens.MAX_ZOOM else 1.4f)
+        } else {
+            stops.lastOrNull { it < current - 0.05f } ?: 1.0f
+        }
+        smoothAnimateZoomTo(target)
+    }
+
+    fun smoothAnimateZoomTo(targetZoom: Float, durationMs: Long = 240L) {
+        zoomAnimationJob?.cancel()
+        volumeZoomJob?.cancel()
+        zoomAnimationJob = viewModelScope.launch {
+            val isBack = _uiState.value.isBackCamera
+            val minZoom = if (isBack) OpticalLens.MIN_ZOOM else 1.0f
+            val maxZoom = if (isBack) OpticalLens.MAX_ZOOM else 4.0f
+            val startZoom = _uiState.value.currentZoomRatio
+            val clampedTarget = targetZoom.coerceIn(minZoom, maxZoom)
+            if (kotlin.math.abs(startZoom - clampedTarget) < 0.01f) {
+                handleZoomChanged(clampedTarget)
+                return@launch
+            }
+            val startTime = System.currentTimeMillis()
+
+            // Perceptual logarithmic space interpolation for cinema-smooth optical feel
+            val startLog = kotlin.math.ln(startZoom.toDouble())
+            val targetLog = kotlin.math.ln(clampedTarget.toDouble())
+
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - startTime
+                val progress = (elapsed.toFloat() / durationMs).coerceIn(0f, 1f)
+
+                // Smooth cubic ease-in-out curve
+                val t = progress
+                val easeProgress = if (t < 0.5f) {
+                    4f * t * t * t
+                } else {
+                    1f - (-2f * t + 2f).let { it * it * it } / 2f
+                }
+
+                val currentLog = startLog + (targetLog - startLog) * easeProgress
+                val z = kotlin.math.exp(currentLog).toFloat()
+
+                handleZoomChanged(z)
+
+                if (progress >= 1f) break
+                delay(16)
+            }
         }
     }
 
     private fun handleFlipCamera() {
         val nextFacing = !_uiState.value.isBackCamera
-        _uiState.update { it.copy(isBackCamera = nextFacing) }
-        rebindCamera(isBackCamera = nextFacing)
+        zoomAnimationJob?.cancel()
+        volumeZoomJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isBackCamera = nextFacing,
+                currentZoomRatio = 1.0f,
+                activeLens = OpticalLens.MAIN_1X,
+                isZoomSliderExpanded = false,
+                isMacroLocked = false
+            )
+        }
+        rebindCamera(
+            isBackCamera = nextFacing,
+            activeLens = OpticalLens.MAIN_1X,
+            displayZoom = 1.0f
+        )
+        controller?.setZoom(1.0f)
     }
 
     private fun handleCycleFlash() {

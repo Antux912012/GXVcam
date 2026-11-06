@@ -63,6 +63,7 @@ fun GXVViewfinderContainer(
     showHorizon: Boolean,
     levelHorizonDegrees: Float,
     currentZoom: Float,
+    isBackCamera: Boolean = true,
     isAeLocked: Boolean = false,
     isAfLocked: Boolean = false,
     isAeAfLocked: Boolean = isAeLocked && isAfLocked,
@@ -128,25 +129,13 @@ fun GXVViewfinderContainer(
     }
 
     val cornerRadius = 28.dp
+    val latestZoom by rememberUpdatedState(currentZoom)
+    val latestContainerSize by rememberUpdatedState(containerSize)
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(OledBlack)
-            .pointerInput(Unit) {
-                var lastZoomTickStep = (currentZoom * 10f).roundToInt()
-                detectTransformGestures { _, _, zoom, _ ->
-                    if (zoom != 1f) {
-                        val targetZoom = (currentZoom * zoom).coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM)
-                        val step = (targetZoom * 10f).roundToInt()
-                        if (step != lastZoomTickStep) {
-                            tactile.triggerTick()
-                            lastZoomTickStep = step
-                        }
-                        onEvent(GXVcamEvent.OnZoomChanged(targetZoom))
-                    }
-                }
-            },
+            .background(OledBlack),
         contentAlignment = Alignment.Center
     ) {
         // Animated Viewfinder Aspect Ratio Box
@@ -171,14 +160,21 @@ fun GXVViewfinderContainer(
                 .clip(RoundedCornerShape(cornerRadius))
                 .clipToBounds()
                 .onSizeChanged { containerSize = it }
-                .pointerInput(Unit) {
+                .pointerInput(isBackCamera) {
                     var lastZoomTickStep = (currentZoom * 10f).roundToInt()
                     detectTransformGestures { _, _, zoom, _ ->
                         if (zoom != 1f) {
-                            val targetZoom = (currentZoom * zoom).coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM)
+                            val base = latestZoom
+                            val minZoom = if (isBackCamera) OpticalLens.MIN_ZOOM else 1.0f
+                            val maxZoom = if (isBackCamera) OpticalLens.MAX_ZOOM else 4.0f
+                            val targetZoom = (base * zoom).coerceIn(minZoom, maxZoom)
                             val step = (targetZoom * 10f).roundToInt()
                             if (step != lastZoomTickStep) {
-                                tactile.triggerTick()
+                                if (step == 10 || (isBackCamera && (step == 6 || step == 20 || step == 30))) {
+                                    tactile.triggerSnap()
+                                } else {
+                                    tactile.triggerTick()
+                                }
                                 lastZoomTickStep = step
                             }
                             onEvent(GXVcamEvent.OnZoomChanged(targetZoom))
@@ -193,13 +189,14 @@ fun GXVViewfinderContainer(
                             isEvExpanded = false
                             lastVibratedIndex = 9 // reset to 0.0 EV
                             showFocusRing = true
-                            if (containerSize.width > 0 && containerSize.height > 0) {
+                            val size = latestContainerSize
+                            if (size.width > 0 && size.height > 0) {
                                 onEvent(
                                     GXVcamEvent.OnTapToFocus(
                                         x = offset.x,
                                         y = offset.y,
-                                        width = containerSize.width,
-                                        height = containerSize.height
+                                        width = size.width,
+                                        height = size.height
                                     )
                                 )
                             }

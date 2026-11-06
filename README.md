@@ -159,6 +159,7 @@ python3 tools/mtk_camera_probe.py --from-file tools/testdata/dumpsys_sample.txt 
 | `docs/MEDIATEK_OPTIMIZATION` | MediaTek ISP / HAL specifics |
 | `docs/IMAGING_PIPELINE` | RAW fusion and rendering pipeline |
 | [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) | What may and may not be reused from GCam, vivo and open-source projects |
+| [`docs/STABILITY_VERIFICATION_REPORT.md`](docs/STABILITY_VERIFICATION_REPORT.md) | Stability verification and automated test report (ASD-STE100) |
 
 ## Legal notes
 

@@ -16,7 +16,8 @@ object MotoVideoEngine {
         settings: MotoVideoSettings,
         zoomRatio: Float = 1.0f,
         rollDegrees: Float = 0f,
-        supportedKeyNames: Set<String> = emptySet()
+        supportedKeyNames: Set<String> = emptySet(),
+        hasOis: Boolean = true
     ) {
         // 1. Target AE FPS range (e.g. 30..30, 60..60, or 120..120)
         // MediaTek Dimensity 7300 supports up to 30fps for 4K UHD and dual concurrent capture
@@ -43,13 +44,16 @@ object MotoVideoEngine {
         setIfSupported(builder, MtkMotoVendorTags.MTK_PIP_DEVICES, dualVal, supportedKeyNames)
 
         // 5. Motorola Edge 50 Neo Stabilization Pipeline (OIS + Smart EIS + 360° Horizon Lock)
-        // Android minSdk = 34 guarantees PREVIEW_STABILIZATION support
+        // Ultra-wide (GC13A2) lacks physical OIS; disable OIS when unsupported or stabilization is OFF
+        val effectiveOis = if (hasOis && settings.stabilization != MotoVideoStabilization.OFF) {
+            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
+        } else {
+            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
+        }
+        builder.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, effectiveOis)
+
         when (settings.stabilization) {
             MotoVideoStabilization.OFF -> {
-                builder.setCaptureRequestOption(
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
-                )
                 builder.setCaptureRequestOption(
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
@@ -59,10 +63,6 @@ object MotoVideoEngine {
             }
             MotoVideoStabilization.ADAPTIVE -> {
                 builder.setCaptureRequestOption(
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
-                )
-                builder.setCaptureRequestOption(
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
                 )
@@ -70,10 +70,6 @@ object MotoVideoEngine {
                 setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_IHC, 0, supportedKeyNames)
             }
             MotoVideoStabilization.HORIZON_LOCK -> {
-                builder.setCaptureRequestOption(
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
-                )
                 builder.setCaptureRequestOption(
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
@@ -93,7 +89,11 @@ object MotoVideoEngine {
         supportedKeyNames: Set<String>
     ) {
         if (key != null && (supportedKeyNames.isEmpty() || supportedKeyNames.contains(key.name))) {
-            builder.setCaptureRequestOption(key, value)
+            try {
+                builder.setCaptureRequestOption(key, value)
+            } catch (_: IllegalArgumentException) {
+                // Key not supported on the active camera sensor HAL
+            }
         }
     }
 }

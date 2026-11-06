@@ -101,9 +101,11 @@ fun ExpressiveLensSelector(
     currentZoomRatio: Float,
     onLensSelected: (OpticalLens) -> Unit,
     onZoomChanged: (Float) -> Unit,
+    onZoomStep: (Float) -> Unit = onZoomChanged,
     isExpanded: Boolean = false,
     onExpandedChange: (Boolean) -> Unit = {},
     isFull: Boolean = false,
+    isBackCamera: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val tactile = rememberTactileFeedback()
@@ -111,16 +113,16 @@ fun ExpressiveLensSelector(
     var lastHapticStep by remember { mutableIntStateOf((currentZoomRatio * 10f).roundToInt()) }
 
     val pillContainerColor = if (isFull) Color(0x66000000) else DarkSurfaceContainerHigh
-    val pillBorder = if (isFull) BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)) else null
+    val pillBorder = BorderStroke(1.dp, Color.White.copy(alpha = if (isFull) 0.22f else 0.12f))
     val primaryColor = MaterialTheme.colorScheme.primary
 
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Continuous Dial & Precision Arc Ruler Deck
+        // Continuous Dial & Precision Arc Ruler Deck (rear camera only)
         AnimatedVisibility(
-            visible = isExpanded,
+            visible = isExpanded && isBackCamera,
             enter = fadeIn(GXVMotion.fastEffects()) + expandVertically(GXVMotion.spatialBouncy()),
             exit = fadeOut(GXVMotion.fastEffects()) + shrinkVertically(GXVMotion.fastEffects())
         ) {
@@ -201,7 +203,7 @@ fun ExpressiveLensSelector(
                                     .clickable {
                                         tactile.triggerSnap()
                                         lastInteractionTime = System.currentTimeMillis()
-                                        onZoomChanged(chipZoom)
+                                        onZoomStep(chipZoom)
                                     }
                                     .padding(horizontal = 10.dp, vertical = 4.dp),
                                 contentAlignment = Alignment.Center
@@ -233,7 +235,7 @@ fun ExpressiveLensSelector(
                                     tactile.triggerTick()
                                     lastInteractionTime = System.currentTimeMillis()
                                     val next = ((currentZoomRatio - 0.1f) * 10f).roundToInt() / 10f
-                                    onZoomChanged(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
+                                    onZoomStep(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -352,7 +354,7 @@ fun ExpressiveLensSelector(
                                     tactile.triggerTick()
                                     lastInteractionTime = System.currentTimeMillis()
                                     val next = ((currentZoomRatio + 0.1f) * 10f).roundToInt() / 10f
-                                    onZoomChanged(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
+                                    onZoomStep(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -378,88 +380,130 @@ fun ExpressiveLensSelector(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val presets = listOf(OpticalLens.UW, OpticalLens.MAIN_1X, OpticalLens.CROP_2X, OpticalLens.TELE_3X)
+                if (isBackCamera) {
+                    val presets = listOf(OpticalLens.UW, OpticalLens.MAIN_1X, OpticalLens.CROP_2X, OpticalLens.TELE_3X)
 
-                presets.forEach { lens ->
-                    val isSelected = activeLens == lens
+                    presets.forEach { lens ->
+                        val isSelected = activeLens == lens
 
-                    // Format pill label: if current zoom is intermediate (e.g. 1.2x), reflect it directly
-                    val pillLabel = if (isSelected) {
-                        val formattedZoom = if (currentZoomRatio >= 10f) {
-                            String.format(java.util.Locale.US, "%.0fx", currentZoomRatio)
+                        // Format pill label: if current zoom is intermediate (e.g. 1.2x), reflect it directly
+                        val pillLabel = if (isSelected) {
+                            val formattedZoom = if (currentZoomRatio >= 10f) {
+                                String.format(java.util.Locale.US, "%.0fx", currentZoomRatio)
+                            } else {
+                                String.format(java.util.Locale.US, "%.1fx", currentZoomRatio)
+                            }
+                            val focalMm = OpticalLens.focalLengthForZoom(currentZoomRatio)
+                            "$formattedZoom • ${focalMm}mm"
                         } else {
-                            String.format(java.util.Locale.US, "%.1fx", currentZoomRatio)
+                            lens.label
                         }
-                        val focalMm = OpticalLens.focalLengthForZoom(currentZoomRatio)
-                        "$formattedZoom • ${focalMm}mm"
-                    } else {
-                        lens.label
+
+                        val pillWidth by animateDpAsState(
+                            targetValue = if (isSelected) 88.dp else 40.dp,
+                            animationSpec = GXVMotion.pillMorph(),
+                            label = "lensPillWidth"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .width(pillWidth)
+                                .fillMaxHeight()
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                )
+                                .clickable {
+                                    if (isSelected) {
+                                        // Tapping already-selected lens toggles the continuous zoom ruler
+                                        tactile.triggerSnap()
+                                        onExpandedChange(!isExpanded)
+                                        lastInteractionTime = System.currentTimeMillis()
+                                    } else {
+                                        // Tapping different lens snaps to its preset
+                                        tactile.triggerSnap()
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        onLensSelected(lens)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = pillLabel,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    Color.White.copy(alpha = 0.85f)
+                                },
+                                fontSize = if (isSelected) 11.sp else 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
                     }
 
-                    val pillWidth by animateDpAsState(
-                        targetValue = if (isSelected) 88.dp else 40.dp,
-                        animationSpec = GXVMotion.spatialBouncy(),
-                        label = "lensPillWidth"
-                    )
-
+                    // Ruler Expansion Toggle button
                     Box(
                         modifier = Modifier
-                            .width(pillWidth)
-                            .fillMaxHeight()
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                if (isExpanded) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
                             )
                             .clickable {
-                                if (isSelected) {
-                                    // Tapping already-selected lens toggles the continuous zoom ruler
-                                    tactile.triggerSnap()
-                                    onExpandedChange(!isExpanded)
-                                    lastInteractionTime = System.currentTimeMillis()
-                                } else {
-                                    // Tapping different lens snaps to its preset
-                                    tactile.triggerSnap()
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    onLensSelected(lens)
-                                }
+                                tactile.triggerSnap()
+                                onExpandedChange(!isExpanded)
+                                lastInteractionTime = System.currentTimeMillis()
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = pillLabel,
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                Color.White.copy(alpha = 0.85f)
-                            },
-                            fontSize = if (isSelected) 11.sp else 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Expand Continuous Zoom Wheel",
+                            tint = if (isExpanded) MaterialTheme.colorScheme.onSecondaryContainer else Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
-                }
+                } else {
+                    // Front Camera: 1.0x (normal view angle) and 1.4x (portrait mode crop)
+                    val frontOptions = listOf(1.0f to "1x", 1.4f to "1.4x")
+                    frontOptions.forEach { (zoomStop, label) ->
+                        val isSelected = (zoomStop == 1.0f && currentZoomRatio < 1.2f) ||
+                                (zoomStop == 1.4f && currentZoomRatio >= 1.2f)
 
-                // Ruler Expansion Toggle button
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isExpanded) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+                        val pillWidth by animateDpAsState(
+                            targetValue = if (isSelected) 60.dp else 42.dp,
+                            animationSpec = GXVMotion.pillMorph(),
+                            label = "frontLensPillWidth"
                         )
-                        .clickable {
-                            tactile.triggerSnap()
-                            onExpandedChange(!isExpanded)
-                            lastInteractionTime = System.currentTimeMillis()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Expand Continuous Zoom Wheel",
-                        tint = if (isExpanded) MaterialTheme.colorScheme.onSecondaryContainer else Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(18.dp)
-                    )
+
+                        Box(
+                            modifier = Modifier
+                                .width(pillWidth)
+                                .fillMaxHeight()
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                )
+                                .clickable {
+                                    tactile.triggerSnap()
+                                    onZoomStep(zoomStop)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    Color.White.copy(alpha = 0.85f)
+                                },
+                                fontSize = if (isSelected) 12.sp else 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -20,4 +20,14 @@ object NativeEngineBridge {
         whiteLevel: Float,
         blackLevel: FloatArray
     ): Boolean
+
+    external fun unpackRaw10Native(
+        directBuffer: ByteBuffer,
+        bufferSize: Int,
+        width: Int,
+        height: Int,
+        rowStrideBytes: Int,
+        whiteLevel: Float,
+        blackLevel: FloatArray
+    ): Boolean
 }

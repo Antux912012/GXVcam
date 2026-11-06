@@ -21,17 +21,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import android.view.KeyEvent
+import androidx.activity.viewModels
 import org.gxvcam.camera.GXVcamController
 import org.gxvcam.sensors.HorizonSensorManager
 import org.gxvcam.ui.GXVcamScreen
 import org.gxvcam.ui.state.GXVcamEvent
 import org.gxvcam.ui.state.GXVcamViewModel
+import org.gxvcam.ui.state.VolumeKeyAction
 import org.gxvcam.ui.theme.DarkBackground
 import org.gxvcam.ui.theme.GXVcamTheme
 
 class MainActivity : ComponentActivity() {
 
+    private val gxvViewModel: GXVcamViewModel by viewModels()
     private lateinit var cameraController: GXVcamController
 
     private val requiredPermissions = arrayOf(
@@ -51,7 +54,6 @@ class MainActivity : ComponentActivity() {
         cameraController = GXVcamController(applicationContext, lifecycleOwner = this)
 
         setContent {
-            val gxvViewModel: GXVcamViewModel = viewModel()
             val uiState by gxvViewModel.uiState.collectAsStateWithLifecycle()
 
             GXVcamTheme(accentTheme = uiState.manualSettings.accentTheme) {
@@ -80,9 +82,18 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    DisposableEffect(Unit) {
-                        horizonSensorManager.start()
+                    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                            when (event) {
+                                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> horizonSensorManager.start()
+                                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> horizonSensorManager.stop()
+                                else -> {}
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
                         onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
                             horizonSensorManager.stop()
                         }
                     }
@@ -160,6 +171,44 @@ class MainActivity : ComponentActivity() {
         return requiredPermissions.all {
             ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
         }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            val action = gxvViewModel.uiState.value.manualSettings.volumeKeyAction
+            when (action) {
+                VolumeKeyAction.ZOOM -> {
+                    val isZoomIn = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+                    if (event?.repeatCount == 0) {
+                        gxvViewModel.onEvent(GXVcamEvent.OnVolumeZoomHold(isZoomIn = isZoomIn))
+                    }
+                    return true
+                }
+                VolumeKeyAction.SHUTTER -> {
+                    if (event?.repeatCount == 0) {
+                        gxvViewModel.onEvent(GXVcamEvent.OnShutterClicked)
+                    }
+                    return true
+                }
+                VolumeKeyAction.VOLUME -> {
+                    return super.onKeyDown(keyCode, event)
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            val action = gxvViewModel.uiState.value.manualSettings.volumeKeyAction
+            if (action == VolumeKeyAction.ZOOM) {
+                gxvViewModel.onEvent(GXVcamEvent.OnVolumeZoomReleased)
+                return true
+            } else if (action == VolumeKeyAction.SHUTTER) {
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun onDestroy() {

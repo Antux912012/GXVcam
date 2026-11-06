@@ -26,6 +26,7 @@ import org.gxvcam.ui.state.CaptureFormat
 import org.gxvcam.ui.state.ColorSpaceOption
 import org.gxvcam.ui.state.GridType
 import org.gxvcam.ui.state.ProLayoutPosition
+import org.gxvcam.ui.state.VolumeKeyAction
 import org.gxvcam.ui.state.WatermarkStyle
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
 import kotlin.math.roundToInt
@@ -524,6 +525,47 @@ fun CameraSettingsBottomSheet(
                     }
                 }
             }
+
+            // Hardware Controls & Volume Rocker (Google Camera Feature)
+            SettingsSectionHeader(
+                icon = Icons.Default.VolumeUp,
+                title = "Hardware Controls & Volume Rocker",
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Volume Buttons Action",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Configure hardware volume keys: Smooth Cinema Zoom, Shutter Trigger, or System Volume",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    VolumeKeyAction.entries.forEach { action ->
+                        val isSelected = settings.volumeKeyAction == action
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                onUpdateSettings(settings.copy(volumeKeyAction = action))
+                            },
+                            label = { Text(action.shortLabel, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             // Grid Overlay Style
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

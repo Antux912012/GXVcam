@@ -318,14 +318,14 @@ private fun VerticalChipsRail(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = DarkSurfaceContainerHigh.copy(alpha = 0.88f),
+        shape = RoundedCornerShape(24.dp),
+        color = DarkSurfaceContainerHigh.copy(alpha = 0.90f),
         tonalElevation = 6.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)),
-        modifier = modifier.width(52.dp),
+        modifier = modifier.width(62.dp),
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -337,7 +337,7 @@ private fun VerticalChipsRail(
                     onClick = { onControlSelected(if (isSelected) null else chip.id) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
+                        .height(54.dp),
                 )
             }
 
@@ -348,12 +348,12 @@ private fun VerticalChipsRail(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.primary,
                     ),
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(38.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.RestartAlt,
                         contentDescription = "Reset All Pro to Auto",
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
@@ -383,7 +383,7 @@ private fun HorizontalChipsRail(
                 onClick = { onControlSelected(if (isSelected) null else chip.id) },
                 modifier = Modifier
                     .weight(1f)
-                    .height(46.dp),
+                    .height(50.dp),
             )
         }
 
@@ -394,7 +394,7 @@ private fun HorizontalChipsRail(
                     containerColor = DarkSurfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.primary,
                 ),
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(38.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.RestartAlt,
@@ -425,7 +425,7 @@ private fun ProChipItem(
             .clip(RoundedCornerShape(16.dp))
             .then(
                 if (chip.isManual && !isSelected) {
-                    Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                    Modifier.border(1.2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
                 } else {
                     Modifier
                 },
@@ -433,7 +433,7 @@ private fun ProChipItem(
             .clickable(onClick = onClick),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 5.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -442,11 +442,13 @@ private fun ProChipItem(
                 color = when {
                     isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
                     chip.isManual -> MaterialTheme.colorScheme.primary
-                    else -> Color.White.copy(alpha = 0.65f)
+                    else -> Color.White.copy(alpha = 0.70f)
                 },
-                fontSize = 9.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = chip.value,
                 color = when {
@@ -472,7 +474,7 @@ private fun ExpandedControlCard(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         color = DarkSurfaceContainerHigh.copy(alpha = 0.95f),
         tonalElevation = 8.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),

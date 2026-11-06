@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.gxvcam.ui.state.AccentTheme
 import org.gxvcam.ui.state.CameraManualSettings
 import org.gxvcam.ui.state.GridType
 import org.gxvcam.ui.state.ProLayoutPosition
@@ -274,6 +275,75 @@ fun CameraSettingsBottomSheet(
                             ),
                             modifier = Modifier.weight(1f),
                         )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // SECTION 4: Material 3 Expressive & Pantone Accent Theming
+            SettingsSectionHeader(
+                icon = Icons.Default.Palette,
+                title = "Material 3 Expressive & Pantone Accent",
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Color Accent & Theming",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Select from official Motorola Edge 50 Neo Pantone editions or Google Material You dynamic colors",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AccentTheme.entries.chunked(2).forEach { rowAccents ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            rowAccents.forEach { theme ->
+                                val isSelected = settings.accentTheme == theme
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { onUpdateSettings(settings.copy(accentTheme = theme)) },
+                                    leadingIcon = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(theme.colorHex))
+                                        )
+                                    },
+                                    label = {
+                                        Column(modifier = Modifier.padding(vertical = 2.dp)) {
+                                            Text(
+                                                text = theme.label,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                            Text(
+                                                text = theme.subtitle,
+                                                fontSize = 10.sp,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else Color.Gray,
+                                                maxLines = 1,
+                                            )
+                                        }
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (rowAccents.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }

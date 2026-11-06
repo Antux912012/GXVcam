@@ -271,6 +271,21 @@ enum class ProLayoutPosition(val label: String, val description: String) {
     BOTTOM_DOCK("Bottom", "Dock above lens selector"),
 }
 
+enum class AccentTheme(
+    val label: String,
+    val subtitle: String,
+    val colorHex: Long,
+    val containerHex: Long,
+) {
+    DYNAMIC_SYSTEM("Material You", "System dynamic wallpaper", 0xFF80CBC4, 0xFF004D40),
+    PANTONE_POINCIANA("Poinciana", "Edge 50 Neo fiery red", 0xFFFF453A, 0xFF5A1010),
+    PANTONE_NAUTICAL_BLUE("Nautical Blue", "Edge 50 Neo ocean blue", 0xFF0A84FF, 0xFF052B59),
+    PANTONE_LATTE("Pantone Lattè", "Edge 50 Neo mocha sand", 0xFFD7CCC8, 0xFF4E342E),
+    PANTONE_GRISAILLE("Grisaille", "Edge 50 Neo slate grey", 0xFFB0BEC5, 0xFF263238),
+    LEICA_AMBER("Leica Amber", "Classic camera gold/amber", 0xFFFFB300, 0xFF4D3800),
+    MINT_EXPRESSIVE("Expressive Mint", "M3 Expressive teal mint", 0xFF30D158, 0xFF0D421D),
+}
+
 @Immutable
 data class CameraManualSettings(
     val isUltraRes50M: Boolean = false,
@@ -286,6 +301,7 @@ data class CameraManualSettings(
     val isHorizonLevelVisible: Boolean = true,
     val gridType: GridType = GridType.RULE_OF_THIRDS,
     val proLayoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
+    val accentTheme: AccentTheme = AccentTheme.PANTONE_POINCIANA,
 )
 
 @Immutable

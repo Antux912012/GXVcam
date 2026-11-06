@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.gxvcam.camera.GXVcamController
 import org.gxvcam.sensors.HorizonSensorManager
@@ -50,7 +51,10 @@ class MainActivity : ComponentActivity() {
         cameraController = GXVcamController(applicationContext, lifecycleOwner = this)
 
         setContent {
-            GXVcamTheme {
+            val gxvViewModel: GXVcamViewModel = viewModel()
+            val uiState by gxvViewModel.uiState.collectAsStateWithLifecycle()
+
+            GXVcamTheme(accentTheme = uiState.manualSettings.accentTheme) {
                 var hasPermissions by remember {
                     mutableStateOf(allPermissionsGranted())
                 }
@@ -62,7 +66,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (hasPermissions) {
-                    val gxvViewModel: GXVcamViewModel = viewModel()
 
                     val horizonSensorManager = remember {
                         HorizonSensorManager(applicationContext) { rollAngle ->

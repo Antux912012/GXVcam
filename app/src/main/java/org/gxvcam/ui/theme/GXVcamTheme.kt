@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import org.gxvcam.ui.state.AccentTheme
 
 // OLED Pure Black palette & semi-transparent container surfaces
 val OledBlack = Color(0xFF000000)
@@ -37,20 +38,38 @@ val M3ExpressiveShapes = Shapes(
 )
 
 @Composable
-fun GXVcamTheme(content: @Composable () -> Unit) {
+fun GXVcamTheme(
+    accentTheme: AccentTheme = AccentTheme.PANTONE_POINCIANA,
+    content: @Composable () -> Unit
+) {
     val context = LocalContext.current
-    val dynamicColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val baseScheme = if (accentTheme == AccentTheme.DYNAMIC_SYSTEM && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         dynamicDarkColorScheme(context)
-    } else {
+    } else if (accentTheme == AccentTheme.DYNAMIC_SYSTEM) {
         BaseDarkColorScheme
+    } else {
+        val primary = Color(accentTheme.colorHex)
+        val container = Color(accentTheme.containerHex)
+        BaseDarkColorScheme.copy(
+            primary = primary,
+            onPrimary = OledBlack,
+            primaryContainer = container,
+            onPrimaryContainer = Color.White,
+            tertiary = primary,
+            tertiaryContainer = container,
+            onTertiary = OledBlack,
+            onTertiaryContainer = Color.White,
+        )
     }
 
-    // Force OLED pure black background and custom elevated dark surfaces while preserving Monet accents
-    val expressiveColorScheme = dynamicColors.copy(
+    // Force OLED pure black background and custom elevated dark surfaces while preserving chosen accents
+    val expressiveColorScheme = baseScheme.copy(
         background = OledBlack,
         surface = DarkSurfaceElevated,
         surfaceContainer = DarkSurfaceContainer,
-        surfaceContainerHigh = DarkSurfaceContainerHigh
+        surfaceContainerHigh = DarkSurfaceContainerHigh,
+        primary = if (accentTheme == AccentTheme.DYNAMIC_SYSTEM) baseScheme.primary else Color(accentTheme.colorHex),
+        primaryContainer = if (accentTheme == AccentTheme.DYNAMIC_SYSTEM) baseScheme.primaryContainer else Color(accentTheme.containerHex),
     )
 
     MaterialTheme(

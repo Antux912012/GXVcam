@@ -264,6 +264,13 @@ enum class GridType(val label: String) {
     CROSSHAIR("Center"),
 }
 
+enum class ProLayoutPosition(val label: String, val description: String) {
+    SIDEBAR_RIGHT("Right", "Vertical bar on right edge"),
+    SIDEBAR_LEFT("Left", "Vertical bar on left edge"),
+    TOP_BAR("Top", "Horizontal strip below top bar"),
+    BOTTOM_DOCK("Bottom", "Dock above lens selector"),
+}
+
 @Immutable
 data class CameraManualSettings(
     val isUltraRes50M: Boolean = false,
@@ -278,6 +285,7 @@ data class CameraManualSettings(
     val isHistogramOverlayVisible: Boolean = true,
     val isHorizonLevelVisible: Boolean = true,
     val gridType: GridType = GridType.RULE_OF_THIRDS,
+    val proLayoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
 )
 
 @Immutable

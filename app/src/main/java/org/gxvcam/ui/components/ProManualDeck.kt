@@ -1,12 +1,8 @@
 package org.gxvcam.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -15,13 +11,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -31,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gxvcam.ui.state.HistogramData
 import org.gxvcam.ui.state.ProHardwareCapabilities
+import org.gxvcam.ui.state.ProLayoutPosition
 import org.gxvcam.ui.state.ProSettings
 import org.gxvcam.ui.state.WhiteBalanceMode
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
@@ -47,228 +44,506 @@ fun ProManualDeck(
     onControlSelected: (String?) -> Unit,
     onProSettingChanged: ((ProSettings) -> ProSettings) -> Unit,
     modifier: Modifier = Modifier,
+    layoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(
-            animationSpec = GXVMotion.spatialSmooth(),
-            initialOffsetY = { it },
-        ) + fadeIn(GXVMotion.fastEffects()),
-        exit = slideOutVertically(
-            animationSpec = GXVMotion.spatialSmooth(),
-            targetOffsetY = { it },
-        ) + fadeOut(GXVMotion.fastEffects()),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            // Expanded Control Slider Dial with Live Readout & Quick Presets
-            activeControl?.let { control ->
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = DarkSurfaceContainerHigh,
-                    tonalElevation = 6.dp,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        // Title + Value Readout + Auto button row
-                        ProControlHeader(
-                            control = control,
-                            proSettings = proSettings,
-                            hardwareCapabilities = hardwareCapabilities,
-                            onResetToAuto = {
-                                onProSettingChanged { s ->
-                                    when (control) {
-                                        "ISO" -> s.copy(isManualIso = false)
-                                        "S" -> s.copy(isManualShutter = false)
-                                        "WB" -> s.copy(whiteBalanceMode = WhiteBalanceMode.AUTO)
-                                        "AF" -> s.copy(isManualFocus = false)
-                                        "EV" -> s.copy(evIndex = 0)
-                                        else -> s
-                                    }
-                                }
-                            },
-                        )
+    val chips = listOf(
+        ProChipData(
+            id = "EV",
+            label = "EV",
+            value = String.format(Locale.US, "%+.1f", proSettings.evIndex * hardwareCapabilities.evStep),
+            isManual = proSettings.evIndex != 0,
+        ),
+        ProChipData(
+            id = "ISO",
+            label = "ISO",
+            value = if (proSettings.isManualIso) "${proSettings.iso}" else "AUTO",
+            isManual = proSettings.isManualIso,
+        ),
+        ProChipData(
+            id = "S",
+            label = "S",
+            value = formatShutterSpeed(proSettings.shutterSpeedNs, proSettings.isManualShutter),
+            isManual = proSettings.isManualShutter,
+        ),
+        ProChipData(
+            id = "WB",
+            label = "WB",
+            value = if (proSettings.whiteBalanceMode == WhiteBalanceMode.AUTO) "AWB" else "${proSettings.whiteBalanceKelvin}K",
+            isManual = proSettings.whiteBalanceMode != WhiteBalanceMode.AUTO,
+        ),
+        ProChipData(
+            id = "AF",
+            label = "AF",
+            value = if (proSettings.isManualFocus) String.format(Locale.US, "%.1fd", proSettings.focusDistanceDiopters) else "AF-C",
+            isManual = proSettings.isManualFocus,
+        ),
+    )
 
-                        // Parameter Slider & Presets
-                        when (control) {
-                            "EV" -> EvSliderControl(
-                                evIndex = proSettings.evIndex,
-                                evRange = hardwareCapabilities.evRange,
-                                onEvChanged = { ev ->
-                                    onProSettingChanged { it.copy(evIndex = ev) }
-                                },
+    val onResetAll: () -> Unit = {
+        onProSettingChanged { s ->
+            s.copy(
+                isManualIso = false,
+                isManualShutter = false,
+                isManualFocus = false,
+                whiteBalanceMode = WhiteBalanceMode.AUTO,
+                evIndex = 0,
+            )
+        }
+    }
+
+    when (layoutPosition) {
+        ProLayoutPosition.SIDEBAR_RIGHT -> {
+            AnimatedVisibility(
+                visible = visible,
+                enter = slideInHorizontally(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    initialOffsetX = { it },
+                ) + fadeIn(GXVMotion.fastEffects()),
+                exit = slideOutHorizontally(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    targetOffsetX = { it },
+                ) + fadeOut(GXVMotion.fastEffects()),
+                modifier = modifier,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Floating Flyout Card on Left of Rail
+                    AnimatedVisibility(
+                        visible = activeControl != null,
+                        enter = fadeIn(GXVMotion.fastEffects()) + slideInHorizontally(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            initialOffsetX = { it / 2 },
+                        ),
+                        exit = fadeOut(GXVMotion.fastEffects()) + slideOutHorizontally(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            targetOffsetX = { it / 2 },
+                        ),
+                    ) {
+                        activeControl?.let { control ->
+                            ExpandedControlCard(
+                                control = control,
+                                proSettings = proSettings,
+                                hardwareCapabilities = hardwareCapabilities,
+                                onProSettingChanged = onProSettingChanged,
+                                onClose = { onControlSelected(null) },
+                                modifier = Modifier.width(260.dp),
                             )
-                            "ISO" -> IsoSliderControl(
-                                currentIso = proSettings.iso,
-                                isManual = proSettings.isManualIso,
-                                isoRange = hardwareCapabilities.isoRange,
-                                onIsoChanged = { iso, manual ->
-                                    onProSettingChanged { it.copy(iso = iso, isManualIso = manual) }
-                                },
-                            )
-                            "S" -> ShutterSliderControl(
-                                currentNs = proSettings.shutterSpeedNs,
-                                isManual = proSettings.isManualShutter,
-                                onShutterChanged = { ns, manual ->
-                                    onProSettingChanged { it.copy(shutterSpeedNs = ns, isManualShutter = manual) }
-                                },
-                            )
-                            "WB" -> WhiteBalanceControl(
-                                currentMode = proSettings.whiteBalanceMode,
-                                currentKelvin = proSettings.whiteBalanceKelvin,
-                                onWbChanged = { mode, kelvin ->
-                                    onProSettingChanged {
-                                        it.copy(whiteBalanceMode = mode, whiteBalanceKelvin = kelvin)
-                                    }
-                                },
-                            )
-                            "AF" -> FocusControl(
-                                currentDistance = proSettings.focusDistanceDiopters,
-                                isManual = proSettings.isManualFocus,
-                                maxDistance = hardwareCapabilities.minFocusDistanceDiopters,
-                                onFocusChanged = { dist, manual ->
-                                    onProSettingChanged {
-                                        it.copy(focusDistanceDiopters = dist, isManualFocus = manual)
-                                    }
-                                },
+                        }
+                    }
+
+                    // Vertical Rail on Right
+                    VerticalChipsRail(
+                        chips = chips,
+                        activeControl = activeControl,
+                        isAnyManual = proSettings.isAnyManual,
+                        onControlSelected = onControlSelected,
+                        onResetAll = onResetAll,
+                    )
+                }
+            }
+        }
+
+        ProLayoutPosition.SIDEBAR_LEFT -> {
+            AnimatedVisibility(
+                visible = visible,
+                enter = slideInHorizontally(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    initialOffsetX = { -it },
+                ) + fadeIn(GXVMotion.fastEffects()),
+                exit = slideOutHorizontally(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    targetOffsetX = { -it },
+                ) + fadeOut(GXVMotion.fastEffects()),
+                modifier = modifier,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Vertical Rail on Left
+                    VerticalChipsRail(
+                        chips = chips,
+                        activeControl = activeControl,
+                        isAnyManual = proSettings.isAnyManual,
+                        onControlSelected = onControlSelected,
+                        onResetAll = onResetAll,
+                    )
+
+                    // Floating Flyout Card on Right of Rail
+                    AnimatedVisibility(
+                        visible = activeControl != null,
+                        enter = fadeIn(GXVMotion.fastEffects()) + slideInHorizontally(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            initialOffsetX = { -it / 2 },
+                        ),
+                        exit = fadeOut(GXVMotion.fastEffects()) + slideOutHorizontally(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            targetOffsetX = { -it / 2 },
+                        ),
+                    ) {
+                        activeControl?.let { control ->
+                            ExpandedControlCard(
+                                control = control,
+                                proSettings = proSettings,
+                                hardwareCapabilities = hardwareCapabilities,
+                                onProSettingChanged = onProSettingChanged,
+                                onClose = { onControlSelected(null) },
+                                modifier = Modifier.width(260.dp),
                             )
                         }
                     }
                 }
             }
+        }
 
-            // 5 Circular / Oval Pro Setting Chips + Quick Reset All
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        ProLayoutPosition.TOP_BAR -> {
+            AnimatedVisibility(
+                visible = visible,
+                enter = slideInVertically(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    initialOffsetY = { -it },
+                ) + fadeIn(GXVMotion.fastEffects()),
+                exit = slideOutVertically(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    targetOffsetY = { -it },
+                ) + fadeOut(GXVMotion.fastEffects()),
+                modifier = modifier.fillMaxWidth(),
             ) {
-                val chips = listOf(
-                    ProChipData(
-                        id = "EV",
-                        label = "EV",
-                        value = String.format(Locale.US, "%+.1f", proSettings.evIndex * hardwareCapabilities.evStep),
-                        isManual = proSettings.evIndex != 0,
-                    ),
-                    ProChipData(
-                        id = "ISO",
-                        label = "ISO",
-                        value = if (proSettings.isManualIso) "${proSettings.iso}" else "AUTO",
-                        isManual = proSettings.isManualIso,
-                    ),
-                    ProChipData(
-                        id = "S",
-                        label = "S",
-                        value = formatShutterSpeed(proSettings.shutterSpeedNs, proSettings.isManualShutter),
-                        isManual = proSettings.isManualShutter,
-                    ),
-                    ProChipData(
-                        id = "WB",
-                        label = "WB",
-                        value = if (proSettings.whiteBalanceMode == WhiteBalanceMode.AUTO) "AWB" else "${proSettings.whiteBalanceKelvin}K",
-                        isManual = proSettings.whiteBalanceMode != WhiteBalanceMode.AUTO,
-                    ),
-                    ProChipData(
-                        id = "AF",
-                        label = "AF",
-                        value = if (proSettings.isManualFocus) String.format(Locale.US, "%.1fd", proSettings.focusDistanceDiopters) else "AF-C",
-                        isManual = proSettings.isManualFocus,
-                    ),
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    HorizontalChipsRail(
+                        chips = chips,
+                        activeControl = activeControl,
+                        isAnyManual = proSettings.isAnyManual,
+                        onControlSelected = onControlSelected,
+                        onResetAll = onResetAll,
+                    )
 
-                chips.forEach { chip ->
-                    val isSelected = activeControl == chip.id
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = when {
-                            isSelected -> MaterialTheme.colorScheme.primaryContainer
-                            chip.isManual -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
-                            else -> DarkSurfaceContainerHigh
-                        },
-                        tonalElevation = if (isSelected || chip.isManual) 4.dp else 2.dp,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .then(
-                                if (chip.isManual && !isSelected) {
-                                    Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), RoundedCornerShape(18.dp))
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .clickable {
-                                onControlSelected(if (isSelected) null else chip.id)
-                            },
+                    AnimatedVisibility(
+                        visible = activeControl != null,
+                        enter = fadeIn(GXVMotion.fastEffects()) + slideInVertically(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            initialOffsetY = { -it / 2 },
+                        ),
+                        exit = fadeOut(GXVMotion.fastEffects()) + slideOutVertically(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            targetOffsetY = { -it / 2 },
+                        ),
                     ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                text = chip.label,
-                                color = when {
-                                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    chip.isManual -> MaterialTheme.colorScheme.primary
-                                    else -> Color.White.copy(alpha = 0.6f)
-                                },
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                text = chip.value,
-                                color = when {
-                                    isSelected -> MaterialTheme.colorScheme.primary
-                                    chip.isManual -> Color.White
-                                    else -> Color.White
-                                },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
+                        activeControl?.let { control ->
+                            ExpandedControlCard(
+                                control = control,
+                                proSettings = proSettings,
+                                hardwareCapabilities = hardwareCapabilities,
+                                onProSettingChanged = onProSettingChanged,
+                                onClose = { onControlSelected(null) },
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
                 }
+            }
+        }
 
-                // If any parameter is manual, show a subtle reset all button
-                if (proSettings.isAnyManual) {
-                    FilledTonalIconButton(
-                        onClick = {
-                            onProSettingChanged { s ->
-                                s.copy(
-                                    isManualIso = false,
-                                    isManualShutter = false,
-                                    isManualFocus = false,
-                                    whiteBalanceMode = WhiteBalanceMode.AUTO,
-                                    evIndex = 0,
-                                )
-                            }
-                        },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = DarkSurfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.primary,
+        ProLayoutPosition.BOTTOM_DOCK -> {
+            AnimatedVisibility(
+                visible = visible,
+                enter = slideInVertically(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    initialOffsetY = { it },
+                ) + fadeIn(GXVMotion.fastEffects()),
+                exit = slideOutVertically(
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    targetOffsetY = { it },
+                ) + fadeOut(GXVMotion.fastEffects()),
+                modifier = modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    AnimatedVisibility(
+                        visible = activeControl != null,
+                        enter = fadeIn(GXVMotion.fastEffects()) + slideInVertically(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            initialOffsetY = { it / 2 },
                         ),
-                        modifier = Modifier.size(36.dp),
+                        exit = fadeOut(GXVMotion.fastEffects()) + slideOutVertically(
+                            animationSpec = GXVMotion.spatialSmooth(),
+                            targetOffsetY = { it / 2 },
+                        ),
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.RestartAlt,
-                            contentDescription = "Reset All Pro to Auto",
-                            modifier = Modifier.size(18.dp),
-                        )
+                        activeControl?.let { control ->
+                            ExpandedControlCard(
+                                control = control,
+                                proSettings = proSettings,
+                                hardwareCapabilities = hardwareCapabilities,
+                                onProSettingChanged = onProSettingChanged,
+                                onClose = { onControlSelected(null) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
+
+                    HorizontalChipsRail(
+                        chips = chips,
+                        activeControl = activeControl,
+                        isAnyManual = proSettings.isAnyManual,
+                        onControlSelected = onControlSelected,
+                        onResetAll = onResetAll,
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VerticalChipsRail(
+    chips: List<ProChipData>,
+    activeControl: String?,
+    isAnyManual: Boolean,
+    onControlSelected: (String?) -> Unit,
+    onResetAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = DarkSurfaceContainerHigh.copy(alpha = 0.88f),
+        tonalElevation = 6.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)),
+        modifier = modifier.width(52.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            chips.forEach { chip ->
+                val isSelected = activeControl == chip.id
+                ProChipItem(
+                    chip = chip,
+                    isSelected = isSelected,
+                    onClick = { onControlSelected(if (isSelected) null else chip.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                )
+            }
+
+            if (isAnyManual) {
+                FilledTonalIconButton(
+                    onClick = onResetAll,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RestartAlt,
+                        contentDescription = "Reset All Pro to Auto",
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HorizontalChipsRail(
+    chips: List<ProChipData>,
+    activeControl: String?,
+    isAnyManual: Boolean,
+    onControlSelected: (String?) -> Unit,
+    onResetAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        chips.forEach { chip ->
+            val isSelected = activeControl == chip.id
+            ProChipItem(
+                chip = chip,
+                isSelected = isSelected,
+                onClick = { onControlSelected(if (isSelected) null else chip.id) },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(46.dp),
+            )
+        }
+
+        if (isAnyManual) {
+            FilledTonalIconButton(
+                onClick = onResetAll,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = DarkSurfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.RestartAlt,
+                    contentDescription = "Reset All Pro to Auto",
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProChipItem(
+    chip: ProChipData,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            chip.isManual -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+            else -> DarkSurfaceContainerHigh
+        },
+        tonalElevation = if (isSelected || chip.isManual) 4.dp else 2.dp,
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .then(
+                if (chip.isManual && !isSelected) {
+                    Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = chip.label,
+                color = when {
+                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                    chip.isManual -> MaterialTheme.colorScheme.primary
+                    else -> Color.White.copy(alpha = 0.65f)
+                },
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = chip.value,
+                color = when {
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    chip.isManual -> Color.White
+                    else -> Color.White
+                },
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExpandedControlCard(
+    control: String,
+    proSettings: ProSettings,
+    hardwareCapabilities: ProHardwareCapabilities,
+    onProSettingChanged: ((ProSettings) -> ProSettings) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = DarkSurfaceContainerHigh.copy(alpha = 0.95f),
+        tonalElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ProControlHeader(
+                control = control,
+                proSettings = proSettings,
+                hardwareCapabilities = hardwareCapabilities,
+                onResetToAuto = {
+                    onProSettingChanged { s ->
+                        when (control) {
+                            "ISO" -> s.copy(isManualIso = false)
+                            "S" -> s.copy(isManualShutter = false)
+                            "WB" -> s.copy(whiteBalanceMode = WhiteBalanceMode.AUTO)
+                            "AF" -> s.copy(isManualFocus = false)
+                            "EV" -> s.copy(evIndex = 0)
+                            else -> s
+                        }
+                    }
+                },
+                onClose = onClose,
+            )
+
+            when (control) {
+                "EV" -> EvSliderControl(
+                    evIndex = proSettings.evIndex,
+                    evRange = hardwareCapabilities.evRange,
+                    onEvChanged = { ev ->
+                        onProSettingChanged { it.copy(evIndex = ev) }
+                    },
+                )
+                "ISO" -> IsoSliderControl(
+                    currentIso = proSettings.iso,
+                    isManual = proSettings.isManualIso,
+                    isoRange = hardwareCapabilities.isoRange,
+                    onIsoChanged = { iso, manual ->
+                        onProSettingChanged { it.copy(iso = iso, isManualIso = manual) }
+                    },
+                )
+                "S" -> ShutterSliderControl(
+                    currentNs = proSettings.shutterSpeedNs,
+                    isManual = proSettings.isManualShutter,
+                    onShutterChanged = { ns, manual ->
+                        onProSettingChanged { it.copy(shutterSpeedNs = ns, isManualShutter = manual) }
+                    },
+                )
+                "WB" -> WhiteBalanceControl(
+                    currentMode = proSettings.whiteBalanceMode,
+                    currentKelvin = proSettings.whiteBalanceKelvin,
+                    onWbChanged = { mode, kelvin ->
+                        onProSettingChanged {
+                            it.copy(whiteBalanceMode = mode, whiteBalanceKelvin = kelvin)
+                        }
+                    },
+                )
+                "AF" -> FocusControl(
+                    currentDistance = proSettings.focusDistanceDiopters,
+                    isManual = proSettings.isManualFocus,
+                    maxDistance = hardwareCapabilities.minFocusDistanceDiopters,
+                    onFocusChanged = { dist, manual ->
+                        onProSettingChanged {
+                            it.copy(focusDistanceDiopters = dist, isManualFocus = manual)
+                        }
+                    },
+                )
             }
         }
     }
@@ -287,6 +562,7 @@ private fun ProControlHeader(
     proSettings: ProSettings,
     hardwareCapabilities: ProHardwareCapabilities,
     onResetToAuto: () -> Unit,
+    onClose: () -> Unit,
 ) {
     val isManual = when (control) {
         "ISO" -> proSettings.isManualIso
@@ -297,19 +573,28 @@ private fun ProControlHeader(
         else -> false
     }
 
+    val controlTitle = when (control) {
+        "EV" -> "EXPOSURE (EV)"
+        "ISO" -> "ISO SENSITIVITY"
+        "S" -> "SHUTTER SPEED"
+        "WB" -> "WHITE BALANCE"
+        "AF" -> "MANUAL FOCUS"
+        else -> control
+    }
+
     val displayValue = when (control) {
         "EV" -> String.format(Locale.US, "%+.1f EV", proSettings.evIndex * hardwareCapabilities.evStep)
-        "ISO" -> if (proSettings.isManualIso) "ISO ${proSettings.iso}" else "AUTO (100-6400)"
+        "ISO" -> if (proSettings.isManualIso) "ISO ${proSettings.iso}" else "AUTO"
         "S" -> formatShutterSpeed(proSettings.shutterSpeedNs, proSettings.isManualShutter)
         "WB" -> when (proSettings.whiteBalanceMode) {
             WhiteBalanceMode.AUTO -> "AUTO AWB"
             WhiteBalanceMode.CUSTOM -> "${proSettings.whiteBalanceKelvin}K Custom"
-            else -> "${proSettings.whiteBalanceKelvin}K ${proSettings.whiteBalanceMode.label}"
+            else -> "${proSettings.whiteBalanceKelvin}K • ${proSettings.whiteBalanceMode.label}"
         }
         "AF" -> if (proSettings.isManualFocus) {
             if (proSettings.focusDistanceDiopters == 0f) "Infinity (∞)"
-            else String.format(Locale.US, "%.1fd (~%.1fm)", proSettings.focusDistanceDiopters, 1f / proSettings.focusDistanceDiopters.coerceAtLeast(0.1f))
-        } else "AUTO (AF-C Continuous)"
+            else String.format(Locale.US, "%.1fd", proSettings.focusDistanceDiopters)
+        } else "AUTO (AF-C)"
         else -> ""
     }
 
@@ -318,43 +603,59 @@ private fun ProControlHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = when (control) {
-                    "EV" -> "EXPOSURE COMPENSATION"
-                    "ISO" -> "ISO SENSITIVITY"
-                    "S" -> "SHUTTER SPEED"
-                    "WB" -> "WHITE BALANCE"
-                    "AF" -> "MANUAL FOCUS"
-                    else -> control
-                },
-                fontSize = 11.sp,
+                text = controlTitle,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 letterSpacing = 0.5.sp,
             )
-            Text(
-                text = displayValue,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-        }
-
-        if (isManual) {
-            TextButton(
-                onClick = onResetToAuto,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                modifier = Modifier.height(28.dp),
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = if (isManual) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             ) {
                 Text(
-                    text = "AUTO",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 11.sp,
+                    text = displayValue,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
+                    color = if (isManual) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (isManual) {
+                FilledTonalButton(
+                    onClick = onResetToAuto,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier.height(28.dp),
+                ) {
+                    Text(
+                        text = "AUTO",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.size(28.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
@@ -370,9 +671,9 @@ private fun EvSliderControl(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("-3", fontSize = 10.sp, color = Color.Gray)
+        Text("-3 EV", fontSize = 10.sp, color = Color.Gray)
         Slider(
             value = evIndex.toFloat(),
             onValueChange = { onEvChanged(it.roundToInt()) },
@@ -384,7 +685,7 @@ private fun EvSliderControl(
             ),
             modifier = Modifier.weight(1f),
         )
-        Text("+3", fontSize = 10.sp, color = Color.Gray)
+        Text("+3 EV", fontSize = 10.sp, color = Color.Gray)
     }
 }
 
@@ -397,8 +698,7 @@ private fun IsoSliderControl(
 ) {
     val presets = listOf(100, 200, 400, 800, 1600, 3200, 6400)
 
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // Quick Presets Row
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -408,7 +708,7 @@ private fun IsoSliderControl(
             FilterChip(
                 selected = !isManual,
                 onClick = { onIsoChanged(currentIso, false) },
-                label = { Text("AUTO", fontSize = 11.sp) },
+                label = { Text("AUTO", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
@@ -426,16 +726,24 @@ private fun IsoSliderControl(
             }
         }
 
-        // Continuous Slider
-        Slider(
-            value = currentIso.toFloat().coerceIn(isoRange.first.toFloat(), isoRange.last.toFloat()),
-            onValueChange = { onIsoChanged(it.roundToInt(), true) },
-            valueRange = isoRange.first.toFloat()..isoRange.last.toFloat().coerceAtMost(6400f),
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-            ),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("${isoRange.first}", fontSize = 10.sp, color = Color.Gray)
+            Slider(
+                value = (if (isManual) currentIso else 100).toFloat().coerceIn(isoRange.first.toFloat(), isoRange.last.toFloat()),
+                onValueChange = { onIsoChanged(it.roundToInt(), true) },
+                valueRange = isoRange.first.toFloat()..isoRange.last.toFloat(),
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            Text("${isoRange.last}", fontSize = 10.sp, color = Color.Gray)
+        }
     }
 }
 
@@ -445,7 +753,6 @@ private fun ShutterSliderControl(
     isManual: Boolean,
     onShutterChanged: (Long, Boolean) -> Unit,
 ) {
-    // Standard photographic shutter stops (in nanoseconds)
     val shutterStops = listOf(
         "1/4000" to 250_000L,
         "1/2000" to 500_000L,
@@ -467,7 +774,7 @@ private fun ShutterSliderControl(
         "32s" to 32_000_000_000L,
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -477,7 +784,7 @@ private fun ShutterSliderControl(
             FilterChip(
                 selected = !isManual,
                 onClick = { onShutterChanged(currentNs, false) },
-                label = { Text("AUTO", fontSize = 11.sp) },
+                label = { Text("AUTO", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
@@ -503,7 +810,7 @@ private fun WhiteBalanceControl(
     currentKelvin: Int,
     onWbChanged: (WhiteBalanceMode, Int) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -523,16 +830,24 @@ private fun WhiteBalanceControl(
             }
         }
 
-        // Kelvin Fine Tuning Slider
-        Slider(
-            value = currentKelvin.toFloat().coerceIn(2500f, 9000f),
-            onValueChange = { onWbChanged(WhiteBalanceMode.CUSTOM, it.roundToInt()) },
-            valueRange = 2500f..9000f,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-            ),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("2500K", fontSize = 10.sp, color = Color.Gray)
+            Slider(
+                value = currentKelvin.toFloat().coerceIn(2500f, 9000f),
+                onValueChange = { onWbChanged(WhiteBalanceMode.CUSTOM, it.roundToInt()) },
+                valueRange = 2500f..9000f,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            Text("9000K", fontSize = 10.sp, color = Color.Gray)
+        }
     }
 }
 
@@ -543,7 +858,7 @@ private fun FocusControl(
     maxDistance: Float,
     onFocusChanged: (Float, Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -551,7 +866,7 @@ private fun FocusControl(
             FilterChip(
                 selected = !isManual,
                 onClick = { onFocusChanged(0f, false) },
-                label = { Text("AF-C", fontSize = 11.sp) },
+                label = { Text("AF-C", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
@@ -559,7 +874,7 @@ private fun FocusControl(
             FilterChip(
                 selected = isManual && currentDistance == 0f,
                 onClick = { onFocusChanged(0f, true) },
-                label = { Text("Infinity (∞)", fontSize = 11.sp) },
+                label = { Text("Infinity ∞", fontSize = 11.sp) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
@@ -574,15 +889,24 @@ private fun FocusControl(
             )
         }
 
-        Slider(
-            value = currentDistance.coerceIn(0f, maxDistance),
-            onValueChange = { onFocusChanged(it, true) },
-            valueRange = 0f..maxDistance,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-            ),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("∞", fontSize = 12.sp, color = Color.Gray)
+            Slider(
+                value = currentDistance.coerceIn(0f, maxDistance),
+                onValueChange = { onFocusChanged(it, true) },
+                valueRange = 0f..maxDistance,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            Text("Macro", fontSize = 10.sp, color = Color.Gray)
+        }
     }
 }
 

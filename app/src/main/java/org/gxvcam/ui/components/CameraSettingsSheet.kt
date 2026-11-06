@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gxvcam.ui.state.CameraManualSettings
 import org.gxvcam.ui.state.GridType
+import org.gxvcam.ui.state.ProLayoutPosition
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -233,6 +234,45 @@ fun CameraSettingsBottomSheet(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             ),
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // SECTION 3: Pro Controls Layout & Positioning
+            SettingsSectionHeader(
+                icon = Icons.Default.Tune,
+                title = "Pro Mode Layout & Placement",
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Controls Position",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Choose where manual dials appear: vertical sidebar (left/right) or horizontal strip (top/bottom)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    ProLayoutPosition.entries.forEach { pos ->
+                        val isSelected = settings.proLayoutPosition == pos
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onUpdateSettings(settings.copy(proLayoutPosition = pos)) },
+                            label = { Text(pos.label, fontSize = 11.sp, maxLines = 1) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }

@@ -113,6 +113,54 @@ fun GXVcamScreenContent(
                     onUpdateVideo = { onEvent(GXVcamEvent.UpdateMotoVideoSettings(it)) }
                 )
             }
+
+            // Pro Manual Top Bar (when TOP_BAR layout is selected)
+            if (uiState.manualSettings.proLayoutPosition == org.gxvcam.ui.state.ProLayoutPosition.TOP_BAR) {
+                ProManualDeck(
+                    visible = uiState.currentMode == CameraMode.PRO,
+                    proSettings = uiState.proSettings,
+                    activeControl = uiState.activeProControl,
+                    hardwareCapabilities = uiState.hardwareCapabilities,
+                    onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
+                    onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
+                    layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.TOP_BAR,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                )
+            }
+        }
+
+        // Pro Manual Vertical Sidebar (Right edge)
+        if (uiState.manualSettings.proLayoutPosition == org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_RIGHT) {
+            ProManualDeck(
+                visible = uiState.currentMode == CameraMode.PRO,
+                proSettings = uiState.proSettings,
+                activeControl = uiState.activeProControl,
+                hardwareCapabilities = uiState.hardwareCapabilities,
+                onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
+                onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
+                layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_RIGHT,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 10.dp),
+            )
+        }
+
+        // Pro Manual Vertical Sidebar (Left edge)
+        if (uiState.manualSettings.proLayoutPosition == org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_LEFT) {
+            ProManualDeck(
+                visible = uiState.currentMode == CameraMode.PRO,
+                proSettings = uiState.proSettings,
+                activeControl = uiState.activeProControl,
+                hardwareCapabilities = uiState.hardwareCapabilities,
+                onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
+                onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
+                layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_LEFT,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 10.dp),
+            )
         }
 
         // Bottom Overlays: Pro Controls, AGC LUT Carousel, Lens Selector, and Control Deck
@@ -124,15 +172,19 @@ fun GXVcamScreenContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Pro Manual Parameter Deck (visible in PRO mode)
-            ProManualDeck(
-                visible = uiState.currentMode == CameraMode.PRO,
-                proSettings = uiState.proSettings,
-                activeControl = uiState.activeProControl,
-                hardwareCapabilities = uiState.hardwareCapabilities,
-                onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
-                onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) }
-            )
+            // Pro Manual Parameter Deck (visible in PRO mode only if BOTTOM_DOCK is selected)
+            if (uiState.manualSettings.proLayoutPosition == org.gxvcam.ui.state.ProLayoutPosition.BOTTOM_DOCK) {
+                ProManualDeck(
+                    visible = uiState.currentMode == CameraMode.PRO,
+                    proSettings = uiState.proSettings,
+                    activeControl = uiState.activeProControl,
+                    hardwareCapabilities = uiState.hardwareCapabilities,
+                    onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
+                    onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
+                    layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.BOTTOM_DOCK,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             // AGC LUT Color Profile Carousel (hidden in PRO mode to prevent visual clutter)
             AnimatedVisibility(

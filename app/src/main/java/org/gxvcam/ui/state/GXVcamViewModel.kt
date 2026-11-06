@@ -80,6 +80,9 @@ class GXVcamViewModel : ViewModel() {
 
             is GXVcamEvent.SetZoomRatio -> handleZoomChanged(event.zoom)
             is GXVcamEvent.OnZoomChanged -> handleZoomChanged(event.zoomRatio)
+            is GXVcamEvent.SetZoomSliderExpanded -> {
+                _uiState.update { it.copy(isZoomSliderExpanded = event.expanded) }
+            }
 
             is GXVcamEvent.ToggleCameraFacing -> handleFlipCamera()
             is GXVcamEvent.OnFlipCamera -> handleFlipCamera()

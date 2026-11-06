@@ -2,6 +2,7 @@ package org.gxvcam.ui.state
 
 import android.net.Uri
 import androidx.compose.runtime.Immutable
+import kotlin.math.roundToInt
 
 enum class CameraMode {
     PHOTO,
@@ -37,7 +38,7 @@ enum class OpticalLens(
 
     companion object {
         val MIN_ZOOM: Float = UW.zoomRatio
-        const val MAX_ZOOM: Float = 10.0f
+        const val MAX_ZOOM: Float = 20.0f
 
         /** Picks the lens that should serve a given equivalent zoom ratio. */
         fun forZoom(zoom: Float): OpticalLens = when {
@@ -45,6 +46,22 @@ enum class OpticalLens(
             zoom < CROP_2X.zoomRatio -> MAIN_1X
             zoom < TELE_3X.zoomRatio -> CROP_2X
             else -> TELE_3X
+        }
+
+        /** Computes 35mm-equivalent focal length for any zoom ratio based on the 24mm 1x main lens. */
+        fun focalLengthForZoom(zoom: Float): Int = when {
+            zoom <= 0.65f -> 16
+            else -> (24f * zoom).roundToInt()
+        }
+
+        /** Returns human-readable physical sensor label and active camera ID for a given zoom level. */
+        fun sensorDescriptionForZoom(zoom: Float): String = when {
+            zoom < 1.0f -> "Ultra-Wide 16mm (Sensor 2)"
+            zoom < 2.0f -> "Main Wide ${focalLengthForZoom(zoom)}mm (Sensor 0)"
+            zoom < 3.0f -> "In-Sensor Crop ${focalLengthForZoom(zoom)}mm (Sensor 0)"
+            zoom < 5.0f -> "3x Optical Tele ${focalLengthForZoom(zoom)}mm (Sensor 3)"
+            zoom < 10.0f -> "5x Hybrid Tele ${focalLengthForZoom(zoom)}mm (Sensor 3)"
+            else -> "Super-Res Tele ${focalLengthForZoom(zoom)}mm (Sensor 3)"
         }
     }
 }
@@ -412,7 +429,8 @@ data class GXVcamUiState(
     val isAfLocked: Boolean = false,
     val sonyAfMode: SonyAfMode = SonyAfMode.AF_C,
     val sonyAeMode: SonyAeMode = SonyAeMode.AE_AUTO,
-    val tapFocusEvOffset: Float = 0f
+    val tapFocusEvOffset: Float = 0f,
+    val isZoomSliderExpanded: Boolean = false
 ) {
     val isAeAfLocked: Boolean get() = isAeLocked && isAfLocked
 }
@@ -422,6 +440,7 @@ sealed interface GXVcamEvent {
     data class SelectMode(val mode: CameraMode) : GXVcamEvent
     data class SelectLens(val lens: OpticalLens) : GXVcamEvent
     data class SetZoomRatio(val zoom: Float) : GXVcamEvent
+    data class SetZoomSliderExpanded(val expanded: Boolean) : GXVcamEvent
     data object ToggleCameraFacing : GXVcamEvent
     data object CycleFlashMode : GXVcamEvent
     data object CycleAspectRatio : GXVcamEvent

@@ -272,6 +272,8 @@ fun GXVcamScreenContent(
                 currentZoomRatio = uiState.currentZoomRatio,
                 onLensSelected = { onEvent(GXVcamEvent.OnLensSelected(it)) },
                 onZoomChanged = { onEvent(GXVcamEvent.OnZoomChanged(it)) },
+                isExpanded = uiState.isZoomSliderExpanded,
+                onExpandedChange = { onEvent(GXVcamEvent.SetZoomSliderExpanded(it)) },
                 isFull = isFull
             )
 

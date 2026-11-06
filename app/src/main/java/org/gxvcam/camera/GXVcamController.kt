@@ -432,7 +432,7 @@ class GXVcamController(
         val availableIds = provider.availableCameraInfos.mapNotNull { info ->
             runCatching { Camera2CameraInfo.from(info).cameraId }.getOrNull()
         }.toSet()
-        Log.d(TAG, "CameraX visible camera IDs: $availableIds")
+        Log.i(TAG, "CameraX visible camera IDs: $availableIds")
 
         if (!isBackCamera) {
             return if (FRONT_CAMERA_ID in availableIds) {
@@ -442,16 +442,20 @@ class GXVcamController(
             }
         }
 
+        // On Motorola Edge 50 Neo (MediaTek Dimensity 7300), LOGICAL_BACK_CAMERA_ID ("5")
+        // integrates all 3 physical sensors (0.5x..30.0x) with native hardware Spatial Alignment & Transition (SAT).
+        // Binding this logical multi-camera enables continuous, smooth zoom (1.1x, 1.2x... up to 20x)
+        // with hardware sensor handoff and zero viewfinder freeze or flicker.
+        if (LOGICAL_BACK_CAMERA_ID in availableIds) {
+            Log.i(TAG, "Using logical multi-camera $LOGICAL_BACK_CAMERA_ID (seamless 0.5x-30x SAT)")
+            return ResolvedCamera(selectorForCameraId(LOGICAL_BACK_CAMERA_ID), LOGICAL_BACK_CAMERA_ID, isPhysicalLens = false)
+        }
+
         if (lens.cameraId in availableIds) {
             return ResolvedCamera(selectorForCameraId(lens.cameraId), lens.cameraId, isPhysicalLens = true)
         }
 
-        if (LOGICAL_BACK_CAMERA_ID in availableIds) {
-            Log.w(TAG, "Physical camera ${lens.cameraId} not exposed; using logical camera $LOGICAL_BACK_CAMERA_ID")
-            return ResolvedCamera(selectorForCameraId(LOGICAL_BACK_CAMERA_ID), LOGICAL_BACK_CAMERA_ID, isPhysicalLens = false)
-        }
-
-        Log.w(TAG, "Neither camera ${lens.cameraId} nor logical camera exposed; using default back camera")
+        Log.w(TAG, "Neither logical camera nor camera ${lens.cameraId} exposed; using default back camera")
         return ResolvedCamera(CameraSelector.DEFAULT_BACK_CAMERA, null, isPhysicalLens = false)
     }
 
@@ -799,10 +803,11 @@ class GXVcamController(
      */
     fun setZoom(displayZoom: Float) {
         val cam = camera ?: return
+        this.currentActiveLens = OpticalLens.forZoom(displayZoom)
         val sensorZoom = displayZoom / boundSensorBaseZoom
         val zoomState = cam.cameraInfo.zoomState.value
-        val minZoom = zoomState?.minZoomRatio ?: 1.0f
-        val maxZoom = zoomState?.maxZoomRatio ?: 10.0f
+        val minZoom = zoomState?.minZoomRatio ?: 0.5f
+        val maxZoom = zoomState?.maxZoomRatio ?: 20.0f
         cam.cameraControl.setZoomRatio(sensorZoom.coerceIn(minZoom, maxZoom))
     }
 

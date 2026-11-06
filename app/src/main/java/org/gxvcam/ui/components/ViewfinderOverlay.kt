@@ -53,6 +53,7 @@ import kotlinx.coroutines.delay
 import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.GXVcamEvent
 import org.gxvcam.ui.state.GridType
+import org.gxvcam.ui.state.OpticalLens
 import org.gxvcam.ui.theme.GXVMotion
 import org.gxvcam.ui.theme.OledBlack
 import java.util.Locale
@@ -140,9 +141,16 @@ fun GXVViewfinderContainer(
             .background(OledBlack)
             .onSizeChanged { containerSize = it }
             .pointerInput(Unit) {
+                var lastZoomTickStep = (currentZoom * 10f).roundToInt()
                 detectTransformGestures { _, _, zoom, _ ->
                     if (zoom != 1f) {
-                        onEvent(GXVcamEvent.OnZoomChanged(currentZoom * zoom))
+                        val targetZoom = (currentZoom * zoom).coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM)
+                        val step = (targetZoom * 10f).roundToInt()
+                        if (step != lastZoomTickStep) {
+                            tactile.triggerTick()
+                            lastZoomTickStep = step
+                        }
+                        onEvent(GXVcamEvent.OnZoomChanged(targetZoom))
                     }
                 }
             }

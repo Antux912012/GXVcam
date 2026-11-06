@@ -68,9 +68,16 @@ class MainActivity : ComponentActivity() {
                 if (hasPermissions) {
 
                     val horizonSensorManager = remember {
-                        HorizonSensorManager(applicationContext) { rollAngle ->
-                            gxvViewModel.onEvent(GXVcamEvent.OnLevelHorizonUpdated(rollAngle))
-                        }
+                        HorizonSensorManager(
+                            context = applicationContext,
+                            onTiltChanged = { rollAngle ->
+                                gxvViewModel.onEvent(GXVcamEvent.OnLevelHorizonUpdated(rollAngle))
+                            },
+                            onOrientationChanged = { cardinalAngle, surfaceRotation ->
+                                cameraController.updateDeviceOrientation(surfaceRotation, cardinalAngle)
+                                gxvViewModel.onEvent(GXVcamEvent.OnDeviceOrientationChanged(surfaceRotation, cardinalAngle))
+                            }
+                        )
                     }
 
                     DisposableEffect(Unit) {

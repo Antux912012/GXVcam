@@ -442,7 +442,8 @@ private fun PatcherSliderItem(
 fun MotoVideoQuickBar(
     videoSettings: MotoVideoSettings,
     onUpdateVideo: (MotoVideoSettings) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tactile: TactileFeedbackController = rememberTactileFeedback()
 ) {
     Row(
         modifier = modifier
@@ -452,10 +453,49 @@ fun MotoVideoQuickBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Stabilization mode cycle
+        // Resolution cycle (4K UHD / 1080p FHD / 720p HD)
+        FilterChip(
+            selected = true,
+            onClick = {
+                tactile.triggerTick()
+                val next = when (videoSettings.resolution) {
+                    VideoResolution.UHD_4K -> VideoResolution.FHD_1080P
+                    VideoResolution.FHD_1080P -> VideoResolution.HD_720P
+                    VideoResolution.HD_720P -> VideoResolution.UHD_4K
+                }
+                onUpdateVideo(videoSettings.copy(resolution = next))
+            },
+            label = { Text(videoSettings.resolution.label) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        )
+
+        // FPS mode cycle (30fps / 60fps / 120fps)
+        FilterChip(
+            selected = true,
+            onClick = {
+                tactile.triggerTick()
+                val next = when (videoSettings.frameRate) {
+                    VideoFrameRate.FPS_30 -> VideoFrameRate.FPS_60
+                    VideoFrameRate.FPS_60 -> VideoFrameRate.SLOW_MO_120
+                    VideoFrameRate.SLOW_MO_120 -> VideoFrameRate.FPS_30
+                }
+                onUpdateVideo(videoSettings.copy(frameRate = next))
+            },
+            label = { Text(videoSettings.frameRate.label) },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        )
+
+        // Stabilization mode cycle (Adaptive / Horizon Lock 360° / Off)
         FilterChip(
             selected = videoSettings.stabilization != MotoVideoStabilization.OFF,
             onClick = {
+                tactile.triggerTick()
                 val next = when (videoSettings.stabilization) {
                     MotoVideoStabilization.OFF -> MotoVideoStabilization.ADAPTIVE
                     MotoVideoStabilization.ADAPTIVE -> MotoVideoStabilization.HORIZON_LOCK
@@ -466,38 +506,43 @@ fun MotoVideoQuickBar(
             label = { Text(videoSettings.stabilization.label) }
         )
 
-        // FPS mode cycle
+        // Video Night Vision
         FilterChip(
-            selected = true,
+            selected = videoSettings.isNightVisionVideoEnabled,
             onClick = {
-                val next = when (videoSettings.frameRate) {
-                    VideoFrameRate.FPS_30 -> VideoFrameRate.FPS_60
-                    VideoFrameRate.FPS_60 -> VideoFrameRate.SLOW_MO_120
-                    VideoFrameRate.SLOW_MO_120 -> VideoFrameRate.FPS_30
-                }
-                onUpdateVideo(videoSettings.copy(frameRate = next))
+                tactile.triggerTick()
+                onUpdateVideo(videoSettings.copy(isNightVisionVideoEnabled = !videoSettings.isNightVisionVideoEnabled))
             },
-            label = { Text(videoSettings.frameRate.label) }
+            label = { Text(if (videoSettings.isNightVisionVideoEnabled) "Night Video ON" else "Night Video") }
         )
 
         // HDR10+ / 10-Bit HLG
         FilterChip(
             selected = videoSettings.isHdr10BitEnabled,
-            onClick = { onUpdateVideo(videoSettings.copy(isHdr10BitEnabled = !videoSettings.isHdr10BitEnabled)) },
-            label = { Text(if (videoSettings.isHdr10BitEnabled) "HDR 10-Bit" else "SDR 8-Bit") }
+            onClick = {
+                tactile.triggerTick()
+                onUpdateVideo(videoSettings.copy(isHdr10BitEnabled = !videoSettings.isHdr10BitEnabled))
+            },
+            label = { Text(if (videoSettings.isHdr10BitEnabled) "HDR10+ 10-Bit" else "SDR 8-Bit") }
         )
 
-        // Audio Zoom
+        // Audio Zoom (Microphone directionality tracking lens zoom)
         FilterChip(
             selected = videoSettings.isAudioZoomEnabled,
-            onClick = { onUpdateVideo(videoSettings.copy(isAudioZoomEnabled = !videoSettings.isAudioZoomEnabled)) },
-            label = { Text("Audio Zoom") }
+            onClick = {
+                tactile.triggerTick()
+                onUpdateVideo(videoSettings.copy(isAudioZoomEnabled = !videoSettings.isAudioZoomEnabled))
+            },
+            label = { Text(if (videoSettings.isAudioZoomEnabled) "Audio Zoom ON" else "Audio Zoom") }
         )
 
         // Dual Capture PIP
         FilterChip(
             selected = videoSettings.isDualCaptureEnabled,
-            onClick = { onUpdateVideo(videoSettings.copy(isDualCaptureEnabled = !videoSettings.isDualCaptureEnabled)) },
+            onClick = {
+                tactile.triggerTick()
+                onUpdateVideo(videoSettings.copy(isDualCaptureEnabled = !videoSettings.isDualCaptureEnabled))
+            },
             label = { Text("Dual PIP") }
         )
     }

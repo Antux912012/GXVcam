@@ -69,6 +69,34 @@ object MtkMotoVendorTags {
     val MOTO_IN_SENSOR_CROP_ENABLE: CaptureRequest.Key<Int>? =
         createRequestKey("com.lenovo.moto.in_sensor_crop.enable", Int::class.javaPrimitiveType)
 
+    // Motorola Edge 50 Neo Video Vendor Tags
+    val MOTO_VIDEO_NV: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.VideoNVwithoutVstab", Int::class.javaPrimitiveType)
+
+    val MOTO_HDR10_TUNING: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.clientapp.hdr10_mode_tuning", Int::class.javaPrimitiveType)
+
+    val MOTO_3D_HDR_MODE: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.3d_hdr_mode", Int::class.javaPrimitiveType)
+
+    val MOTO_VHDR_STATE: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.vhdr_state", Int::class.javaPrimitiveType)
+
+    val MOTO_VSTAB_SMARTEIS: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.vstab_smarteis_enable", Int::class.javaPrimitiveType)
+
+    val MOTO_VSTAB_IHC: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.vstab_ihc_enable", Int::class.javaPrimitiveType)
+
+    val MOTO_VSTAB_PZS: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.vstab_pzs_enable", Int::class.javaPrimitiveType)
+
+    val MOTO_VIDEO_SAT_4K30: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.video_sat_4k30fps_support", Int::class.javaPrimitiveType)
+
+    val MOTO_VIDEO_SAT_4K60: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.control.video_sat_4k60fps_support", Int::class.javaPrimitiveType)
+
     // Static Characteristics Keys
     val MOTO_VENDOR_EXPOSURE_RANGE: CameraCharacteristics.Key<LongArray>? =
         createCharacteristicKey("com.lenovo.moto.sensor.info.exposureTimeRange", LongArray::class.java)

@@ -72,6 +72,12 @@ enum class MotoVideoStabilization(val label: String) {
     HORIZON_LOCK("Horizon 360°")
 }
 
+enum class VideoResolution(val label: String, val shortLabel: String) {
+    UHD_4K("4K UHD", "4K"),
+    FHD_1080P("1080p FHD", "1080p"),
+    HD_720P("720p HD", "720p")
+}
+
 enum class VideoFrameRate(val fps: Int, val label: String) {
     FPS_30(30, "30fps"),
     FPS_60(60, "60fps"),
@@ -80,8 +86,10 @@ enum class VideoFrameRate(val fps: Int, val label: String) {
 
 @Immutable
 data class MotoVideoSettings(
-    val stabilization: MotoVideoStabilization = MotoVideoStabilization.ADAPTIVE,
+    val resolution: VideoResolution = VideoResolution.UHD_4K,
     val frameRate: VideoFrameRate = VideoFrameRate.FPS_60,
+    val stabilization: MotoVideoStabilization = MotoVideoStabilization.ADAPTIVE,
+    val isNightVisionVideoEnabled: Boolean = false,
     val isHdr10BitEnabled: Boolean = false,
     val isAudioZoomEnabled: Boolean = true,
     val isDualCaptureEnabled: Boolean = false,
@@ -458,6 +466,7 @@ sealed interface GXVcamEvent {
     data object OnCycleAspectRatio : GXVcamEvent
     data class OnHardwareCapabilitiesUpdated(val capabilities: ProHardwareCapabilities) : GXVcamEvent
     data class OnRecordingDurationUpdated(val durationMs: Long) : GXVcamEvent
+    data class OnDeviceOrientationChanged(val surfaceRotation: Int, val cardinalAngle: Int) : GXVcamEvent
     data class ToggleLiveViewfinderLut(val enabled: Boolean) : GXVcamEvent
     data object ResetAgcToDefaults : GXVcamEvent
 }

@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.view.Surface
 import kotlin.math.atan2
 
 /**
@@ -13,8 +14,11 @@ import kotlin.math.atan2
  */
 class HorizonSensorManager(
     context: Context,
-    private val onTiltChanged: (Float) -> Unit
+    private val onTiltChanged: (Float) -> Unit,
+    private val onOrientationChanged: ((cardinalAngle: Int, surfaceRotation: Int) -> Unit)? = null
 ) : SensorEventListener {
+
+    constructor(context: Context, onTiltChanged: (Float) -> Unit) : this(context, onTiltChanged, null)
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     // Motorola Camera 5 prefers Sensor.TYPE_GRAVITY (ID 9), falls back to Accelerometer (ID 1)
@@ -26,6 +30,7 @@ class HorizonSensorManager(
     private val orientationPool = FloatArray(poolSize)
     private var poolIndex = 0
     private var poolCount = 0
+    private var lastCardinalAngle = -1
 
     fun start() {
         val targetSensor = sensor ?: return
@@ -72,7 +77,25 @@ class HorizonSensorManager(
             else -> (deg - 180).toFloat() // Upside down 180°
         }
 
-        // 4. Moving average smoothing pool (Motorola Cam 5 mOrientationPool)
+        // 4. Calculate cardinal orientation (0, 90, 180, 270) & Surface rotation
+        val cardinalAngle = when {
+            deg in 45..134 -> 90
+            deg in 135..224 -> 180
+            deg in 225..314 -> 270
+            else -> 0
+        }
+        val surfaceRotation = when (cardinalAngle) {
+            90 -> Surface.ROTATION_270
+            180 -> Surface.ROTATION_180
+            270 -> Surface.ROTATION_90
+            else -> Surface.ROTATION_0
+        }
+        if (cardinalAngle != lastCardinalAngle) {
+            lastCardinalAngle = cardinalAngle
+            onOrientationChanged?.invoke(cardinalAngle, surfaceRotation)
+        }
+
+        // 5. Moving average smoothing pool (Motorola Cam 5 mOrientationPool)
         orientationPool[poolIndex] = relativeRoll
         poolIndex = (poolIndex + 1) % poolSize
         if (poolCount < poolSize) poolCount++

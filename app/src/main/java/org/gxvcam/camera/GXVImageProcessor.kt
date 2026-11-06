@@ -39,7 +39,8 @@ object GXVImageProcessor {
         customSettings: org.gxvcam.ui.state.AgcLibPatcherSettings? = null,
         aspectRatio: AspectRatio = AspectRatio.RATIO_4_3,
         colorSpace: ColorSpaceOption = ColorSpaceOption.SRGB,
-        jpegQuality: Int = 85
+        jpegQuality: Int = 85,
+        rotationDegrees: Int = 0
     ): ByteArray {
         val startTime = System.currentTimeMillis()
         try {
@@ -50,8 +51,20 @@ object GXVImageProcessor {
             val rawBitmap = BitmapFactory.decodeByteArray(inputJpeg, 0, inputJpeg.size, null)
                 ?: return inputJpeg
 
-            // Crop to target aspect ratio (1:1, 3:2, 21:9, etc.)
-            val decodedBitmap = cropToAspectRatio(rawBitmap, aspectRatio)
+            // Physically rotate bitmap based on gravity sensor / CameraX rotationDegrees
+            val uprightBitmap = if (rotationDegrees != 0) {
+                val matrix = android.graphics.Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+                val rotated = Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+                if (rotated != rawBitmap) {
+                    rawBitmap.recycle()
+                }
+                rotated
+            } else {
+                rawBitmap
+            }
+
+            // Crop to target aspect ratio (1:1, 3:2, 21:9, etc.) on the upright bitmap
+            val decodedBitmap = cropToAspectRatio(uprightBitmap, aspectRatio)
 
             val width = decodedBitmap.width
             val height = decodedBitmap.height
@@ -379,8 +392,12 @@ object GXVImageProcessor {
 
             val exifInterface = ExifInterface(tempFile.absolutePath)
             for ((tag, value) in exifTags) {
-                exifInterface.setAttribute(tag, value)
+                if (tag != ExifInterface.TAG_ORIENTATION) {
+                    exifInterface.setAttribute(tag, value)
+                }
             }
+            // Normal (1) because pixels are already physically rotated upright based on device orientation
+            exifInterface.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
             // Add custom software attribution and color space tag
             exifInterface.setAttribute(ExifInterface.TAG_SOFTWARE, "GXVcam (${profile.label} Engine)")
             exifInterface.setAttribute(ExifInterface.TAG_MAKE, "Motorola")

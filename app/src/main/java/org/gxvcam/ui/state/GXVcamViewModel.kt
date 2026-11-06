@@ -317,6 +317,10 @@ class GXVcamViewModel : ViewModel() {
                 _uiState.update { it.copy(recordingDurationMs = event.durationMs) }
             }
 
+            is GXVcamEvent.OnDeviceOrientationChanged -> {
+                controller?.updateDeviceOrientation(event.surfaceRotation, event.cardinalAngle)
+            }
+
             is GXVcamEvent.UpdateMotoVideoSettings -> {
                 _uiState.update { it.copy(motoVideoSettings = event.settings) }
                 controller?.applyMotoVideoSettings(

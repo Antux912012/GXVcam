@@ -12,6 +12,8 @@ import android.hardware.camera2.params.RggbChannelVector
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
+import android.view.OrientationEventListener
+import android.view.Surface
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2CameraInfo
@@ -54,6 +56,7 @@ import org.gxvcam.ui.state.ProHardwareCapabilities
 import org.gxvcam.ui.state.ProSettings
 import org.gxvcam.ui.state.SonyAeMode
 import org.gxvcam.ui.state.SonyAfMode
+import org.gxvcam.ui.state.VideoResolution
 import org.gxvcam.ui.state.WhiteBalanceMode
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -131,20 +134,73 @@ class GXVcamController(
 
     private var activeRecording: Recording? = null
 
+    var deviceSurfaceRotation: Int = Surface.ROTATION_0
+        private set
+    var deviceOrientationAngle: Int = 0
+        private set
+    private var orientationEventListener: OrientationEventListener? = null
+    var currentVideoSettings: MotoVideoSettings = MotoVideoSettings()
+        private set
+
     var onCapabilitiesReady: ((ProHardwareCapabilities) -> Unit)? = null
     var onHistogramReady: ((HistogramData) -> Unit)? = null
 
     init {
+        updateVideoCapture(currentVideoSettings)
+
+        orientationEventListener = object : OrientationEventListener(context) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                val surfaceRotation = when (orientation) {
+                    in 45..134 -> Surface.ROTATION_270
+                    in 135..224 -> Surface.ROTATION_180
+                    in 225..314 -> Surface.ROTATION_90
+                    else -> Surface.ROTATION_0
+                }
+                val cardinalAngle = when (orientation) {
+                    in 45..134 -> 90
+                    in 135..224 -> 180
+                    in 225..314 -> 270
+                    else -> 0
+                }
+                updateDeviceOrientation(surfaceRotation, cardinalAngle)
+            }
+        }
+        if (orientationEventListener?.canDetectOrientation() == true) {
+            orientationEventListener?.enable()
+        }
+    }
+
+    fun updateDeviceOrientation(surfaceRotation: Int, cardinalAngle: Int) {
+        this.deviceSurfaceRotation = surfaceRotation
+        this.deviceOrientationAngle = cardinalAngle
+        try {
+            imageCapture?.targetRotation = surfaceRotation
+            videoCapture?.targetRotation = surfaceRotation
+        } catch (e: Exception) {
+            Log.d(TAG, "targetRotation update ignored: ${e.message}")
+        }
+    }
+
+    fun updateVideoCapture(settings: MotoVideoSettings = currentVideoSettings) {
+        this.currentVideoSettings = settings
+        val quality = when (settings.resolution) {
+            VideoResolution.UHD_4K -> Quality.UHD
+            VideoResolution.FHD_1080P -> Quality.FHD
+            VideoResolution.HD_720P -> Quality.HD
+        }
         val recorder = Recorder.Builder()
             .setQualitySelector(
                 QualitySelector.from(
-                    Quality.UHD,
+                    quality,
                     FallbackStrategy.higherQualityOrLowerThan(Quality.FHD)
                 )
             )
             .setExecutor(cameraExecutor)
             .build()
-        videoCapture = VideoCapture.withOutput(recorder)
+        videoCapture = VideoCapture.Builder(recorder)
+            .setTargetRotation(deviceSurfaceRotation)
+            .build()
     }
 
     fun setLifecycleOwner(owner: LifecycleOwner) {
@@ -223,6 +279,7 @@ class GXVcamController(
                 val useCases = mutableListOf<UseCase>(preview!!)
 
                 if (isVideoMode) {
+                    videoCapture?.targetRotation = deviceSurfaceRotation
                     useCases.add(videoCapture!!)
                     imageCapture = null
                     imageAnalysis = null
@@ -230,6 +287,7 @@ class GXVcamController(
                     val imageCaptureBuilder = ImageCapture.Builder()
                         .setTargetAspectRatio(targetRatio)
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setTargetRotation(deviceSurfaceRotation)
                     imageCapture = imageCaptureBuilder.build()
                     useCases.add(imageCapture!!)
 
@@ -568,11 +626,32 @@ class GXVcamController(
 
     @OptIn(ExperimentalCamera2Interop::class)
     fun applyMotoVideoSettings(settings: MotoVideoSettings, zoomRatio: Float = 1.0f, rollDegrees: Float = 0f) {
+        val previousResolution = currentVideoSettings.resolution
+        this.currentVideoSettings = settings
+
+        if (settings.resolution != previousResolution && activeRecording == null) {
+            updateVideoCapture(settings)
+            if (lastBindConfig?.isVideoMode == true) {
+                lastBindConfig?.let { cfg ->
+                    bindCamera(
+                        isBackCamera = cfg.isBackCamera,
+                        aspectRatio = cfg.aspectRatio,
+                        enableHistogram = cfg.enableHistogram,
+                        enableRawJpeg = cfg.enableRawJpeg,
+                        isVideoMode = true,
+                        activeLens = currentActiveLens,
+                        cameraMode = cfg.cameraMode,
+                        displayZoom = currentActiveLens.zoomRatio
+                    )
+                }
+            }
+        }
+
         val cam = camera ?: return
         try {
             val control2 = Camera2CameraControl.from(cam.cameraControl)
             val builder = CaptureRequestOptions.Builder()
-            MotoVideoEngine.applyVideoInterop(builder, settings, zoomRatio, rollDegrees)
+            MotoVideoEngine.applyVideoInterop(builder, settings, zoomRatio, rollDegrees, supportedRequestKeyNames)
             control2.addCaptureRequestOptions(builder.build())
         } catch (e: Exception) {
             Log.w(TAG, "Error applying Moto video settings: ${e.message}")
@@ -838,6 +917,7 @@ class GXVcamController(
                         val buffer = image.planes[0].buffer
                         val bytes = ByteArray(buffer.remaining())
                         buffer.get(bytes)
+                        val rotationDegrees = image.imageInfo.rotationDegrees
                         image.close()
 
                         val timestamp = System.currentTimeMillis()
@@ -886,7 +966,8 @@ class GXVcamController(
                                 customSettings = agc,
                                 aspectRatio = ratio,
                                 colorSpace = colorSpace,
-                                jpegQuality = jpegQuality
+                                jpegQuality = jpegQuality,
+                                rotationDegrees = rotationDegrees
                             )
 
                             val contentValues = ContentValues().apply {
@@ -984,6 +1065,7 @@ class GXVcamController(
     }
 
     fun release() {
+        orientationEventListener?.disable()
         cameraExecutor.shutdown()
         cameraProvider?.unbindAll()
     }

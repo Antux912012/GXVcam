@@ -8,12 +8,14 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.Shader
-import android.media.ExifInterface
+import androidx.exifinterface.media.ExifInterface
 import android.util.Log
-import android.os.Build
+import android.graphics.BitmapShader
+import android.graphics.RectF
 import org.gxvcam.ui.state.AgcColorProfile
 import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.ColorSpaceOption
+import org.gxvcam.ui.state.DualCaptureLayout
 import org.gxvcam.ui.state.OpticalLens
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -21,6 +23,7 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 import kotlin.math.tanh
 
 /**
@@ -40,7 +43,10 @@ object GXVImageProcessor {
         aspectRatio: AspectRatio = AspectRatio.RATIO_4_3,
         colorSpace: ColorSpaceOption = ColorSpaceOption.SRGB,
         jpegQuality: Int = 85,
-        rotationDegrees: Int = 0
+        rotationDegrees: Int = 0,
+        secondaryBitmap: Bitmap? = null,
+        dualCaptureLayout: DualCaptureLayout = DualCaptureLayout.PIP,
+        isDualCaptureSwapped: Boolean = false
     ): ByteArray {
         val startTime = System.currentTimeMillis()
         try {
@@ -70,16 +76,12 @@ object GXVImageProcessor {
             val height = decodedBitmap.height
 
             // 3. Sensor-Calibrated Color Science with requested Color Space (sRGB / DCI-P3 / Adobe RGB)
-            val processedBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val named = when (colorSpace) {
-                    ColorSpaceOption.SRGB -> android.graphics.ColorSpace.Named.SRGB
-                    ColorSpaceOption.DCI_P3 -> android.graphics.ColorSpace.Named.DISPLAY_P3
-                    ColorSpaceOption.ADOBE_RGB -> android.graphics.ColorSpace.Named.ADOBE_RGB
-                }
-                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888, true, android.graphics.ColorSpace.get(named))
-            } else {
-                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val named = when (colorSpace) {
+                ColorSpaceOption.SRGB -> android.graphics.ColorSpace.Named.SRGB
+                ColorSpaceOption.DCI_P3 -> android.graphics.ColorSpace.Named.DISPLAY_P3
+                ColorSpaceOption.ADOBE_RGB -> android.graphics.ColorSpace.Named.ADOBE_RGB
             }
+            val processedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888, true, android.graphics.ColorSpace.get(named))
             val canvas = Canvas(processedBitmap)
 
             val colorFilter = buildSensorColorFilter(profile, activeLens, customSettings, forLiveViewfinder = false)
@@ -96,6 +98,15 @@ object GXVImageProcessor {
             val vignette = customSettings?.vignetteStrength ?: profile.vignetteStrength
             if (vignette > 0.0f) {
                 applyVignette(canvas, width, height, vignette)
+            }
+
+            // 5.5 Motorola Dual Capture PIP / 50:50 Split Compositing
+            if (secondaryBitmap != null && !secondaryBitmap.isRecycled) {
+                if (dualCaptureLayout == DualCaptureLayout.SPLIT) {
+                    compositeSplit(canvas, width, height, secondaryBitmap, isDualCaptureSwapped)
+                } else {
+                    compositePip(canvas, width, height, secondaryBitmap)
+                }
             }
 
             // 6. Compress to JPEG with user-defined quality setting (default 85%, up to 100%)
@@ -153,6 +164,84 @@ object GXVImageProcessor {
             cropped
         } catch (_: Exception) {
             bitmap
+        }
+    }
+
+    private fun compositePip(
+        canvas: Canvas,
+        canvasW: Int,
+        canvasH: Int,
+        secondary: Bitmap
+    ) {
+        val pipW = (canvasW * 0.30f).toInt()
+        val pipH = (pipW * (4f / 3f)).toInt().coerceAtMost((canvasH * 0.32f).toInt())
+        val padding = (canvasW * 0.04f)
+        val left = canvasW - pipW - padding
+        val top = padding + (canvasH * 0.04f)
+        val right = left + pipW
+        val bottom = top + pipH
+        val rect = RectF(left, top, right, bottom)
+        val cornerRadius = pipW * 0.16f
+
+        // Draw shadow / dark halo
+        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(120, 0, 0, 0)
+            style = Paint.Style.STROKE
+            strokeWidth = 6f
+        }
+        canvas.drawRoundRect(RectF(left - 2, top - 2, right + 2, bottom + 2), cornerRadius, cornerRadius, shadowPaint)
+
+        // Draw rounded secondary bitmap
+        val scaledSec = Bitmap.createScaledBitmap(secondary, pipW, pipH, true)
+        val shader = BitmapShader(scaledSec, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        val matrix = android.graphics.Matrix().apply {
+            postTranslate(left, top)
+        }
+        shader.setLocalMatrix(matrix)
+
+        val pipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.shader = shader
+        }
+        canvas.drawRoundRect(rect, cornerRadius, cornerRadius, pipPaint)
+
+        // Draw white / theme accent border
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
+
+        if (scaledSec != secondary) {
+            scaledSec.recycle()
+        }
+    }
+
+    private fun compositeSplit(
+        canvas: Canvas,
+        canvasW: Int,
+        canvasH: Int,
+        secondary: Bitmap,
+        isSwapped: Boolean
+    ) {
+        val halfH = canvasH / 2
+        val targetRect = if (isSwapped) {
+            RectF(0f, 0f, canvasW.toFloat(), halfH.toFloat())
+        } else {
+            RectF(0f, halfH.toFloat(), canvasW.toFloat(), canvasH.toFloat())
+        }
+        val scaledSec = Bitmap.createScaledBitmap(secondary, canvasW, halfH, true)
+        canvas.drawBitmap(scaledSec, targetRect.left, targetRect.top, null)
+
+        // Sleek divider line
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            strokeWidth = 4f
+        }
+        canvas.drawLine(0f, halfH.toFloat(), canvasW.toFloat(), halfH.toFloat(), linePaint)
+
+        if (scaledSec != secondary) {
+            scaledSec.recycle()
         }
     }
 
@@ -253,7 +342,7 @@ object GXVImageProcessor {
                 u = knee + (1.0f - knee) * (tanh(k * excess).toFloat() / tanhK)
             }
 
-            val res = (u.coerceIn(0.0f, 1.0f) * 255.0f + 0.5f).toInt()
+            val res = (u.coerceIn(0.0f, 1.0f) * 255.0f).roundToInt()
             lut[i] = res.coerceIn(0, 255)
         }
 

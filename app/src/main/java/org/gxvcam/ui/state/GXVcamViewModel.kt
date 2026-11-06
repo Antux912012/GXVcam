@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.gxvcam.camera.GXVcamController
+import kotlin.math.roundToInt
 
 class GXVcamViewModel : ViewModel() {
 
@@ -298,7 +299,7 @@ class GXVcamViewModel : ViewModel() {
             }
 
             is GXVcamEvent.SetTapFocusEv -> {
-                val evInt = Math.round(event.ev).toInt()
+                val evInt = event.ev.roundToInt()
                 _uiState.update { it.copy(tapFocusEvOffset = event.ev, proSettings = it.proSettings.copy(evIndex = evInt)) }
                 controller?.setExposureCompensation(evInt)
             }
@@ -325,12 +326,17 @@ class GXVcamViewModel : ViewModel() {
             }
 
             is GXVcamEvent.UpdateMotoVideoSettings -> {
+                val prevDual = _uiState.value.motoVideoSettings.isDualCaptureEnabled
+                val prevSwap = _uiState.value.motoVideoSettings.isDualCaptureSwapped
                 _uiState.update { it.copy(motoVideoSettings = event.settings) }
                 controller?.applyMotoVideoSettings(
                     settings = event.settings,
                     zoomRatio = _uiState.value.currentZoomRatio,
                     rollDegrees = _uiState.value.levelHorizonDegrees
                 )
+                if (event.settings.isDualCaptureEnabled != prevDual || event.settings.isDualCaptureSwapped != prevSwap) {
+                    rebindCamera()
+                }
             }
 
             is GXVcamEvent.SetDualCaptureLayout -> {
@@ -529,7 +535,7 @@ class GXVcamViewModel : ViewModel() {
             activeLens = activeLens,
             cameraMode = mode,
             displayZoom = displayZoom,
-            isDualCapture = isVideo && _uiState.value.motoVideoSettings.isDualCaptureEnabled,
+            isDualCapture = (isVideo || mode == CameraMode.PHOTO) && _uiState.value.motoVideoSettings.isDualCaptureEnabled,
             isDualCaptureSwapped = _uiState.value.motoVideoSettings.isDualCaptureSwapped,
         )
     }

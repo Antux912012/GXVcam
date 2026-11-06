@@ -23,7 +23,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FlipCameraAndroid
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.VerticalSplit
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,7 +83,7 @@ fun GXVcamScreenContent(
     secondaryViewfinderContent: (@Composable () -> Unit)? = null
 ) {
     val isFull = false
-    val isDualCaptureActive = uiState.currentMode == CameraMode.VIDEO &&
+    val isDualCaptureActive = (uiState.currentMode == CameraMode.VIDEO || uiState.currentMode == CameraMode.PHOTO) &&
             uiState.motoVideoSettings.isDualCaptureEnabled &&
             secondaryViewfinderContent != null
 
@@ -159,7 +166,6 @@ fun GXVcamScreenContent(
                 recordingDurationMs = uiState.recordingDurationMs,
                 onCycleFlash = { onEvent(GXVcamEvent.OnCycleFlash) },
                 onCycleAspectRatio = { onEvent(GXVcamEvent.OnCycleAspectRatio) },
-                onToggleGrid = { onEvent(GXVcamEvent.OnToggleGrid) },
                 onSelectGrid = { onEvent(GXVcamEvent.SetGridType(it)) },
                 onSelectProfile = { onEvent(GXVcamEvent.SelectAgcProfile(it)) },
                 onToggleAeLock = { onEvent(GXVcamEvent.SetAeLock(!uiState.isAeLocked)) },
@@ -172,8 +178,83 @@ fun GXVcamScreenContent(
                 isRawSupported = uiState.hardwareCapabilities.isRawSupported,
                 captureFormat = uiState.manualSettings.captureFormat,
                 onCycleCaptureFormat = { onEvent(GXVcamEvent.CycleCaptureFormat) },
+                isDualCaptureEnabled = uiState.motoVideoSettings.isDualCaptureEnabled,
+                onToggleDualCapture = {
+                    onEvent(
+                        GXVcamEvent.UpdateMotoVideoSettings(
+                            uiState.motoVideoSettings.copy(isDualCaptureEnabled = !uiState.motoVideoSettings.isDualCaptureEnabled)
+                        )
+                    )
+                },
                 isFull = isFull
             )
+
+            // Photo Mode Dual Capture Quick Bar (shown when Dual Cam is active in Photo mode)
+            AnimatedVisibility(
+                visible = uiState.currentMode == CameraMode.PHOTO && uiState.motoVideoSettings.isDualCaptureEnabled,
+                enter = fadeIn(GXVMotion.fastEffects()),
+                exit = fadeOut(GXVMotion.fastEffects())
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilterChip(
+                        selected = true,
+                        onClick = {
+                            val nextLayout = if (uiState.motoVideoSettings.dualCaptureLayout == DualCaptureLayout.PIP) {
+                                DualCaptureLayout.SPLIT
+                            } else {
+                                DualCaptureLayout.PIP
+                            }
+                            onEvent(GXVcamEvent.SetDualCaptureLayout(nextLayout))
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = if (uiState.motoVideoSettings.dualCaptureLayout == DualCaptureLayout.PIP) {
+                                    Icons.Default.PictureInPictureAlt
+                                } else {
+                                    Icons.Default.VerticalSplit
+                                },
+                                contentDescription = "Dual Capture Layout",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = if (uiState.motoVideoSettings.dualCaptureLayout == DualCaptureLayout.PIP) "PIP Window" else "50:50 Split",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    FilterChip(
+                        selected = uiState.motoVideoSettings.isDualCaptureSwapped,
+                        onClick = { onEvent(GXVcamEvent.ToggleDualCaptureSwap) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.FlipCameraAndroid,
+                                contentDescription = "Swap Cameras",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        label = { Text("Swap (⇄)", fontWeight = FontWeight.SemiBold) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    )
+                }
+            }
 
             // Moto Cam 5 Video Quick Bar (shown when in Video mode)
             AnimatedVisibility(

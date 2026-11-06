@@ -1,10 +1,5 @@
 package org.gxvcam.ui.components
 
-import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -41,7 +36,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -139,7 +133,6 @@ fun GXVViewfinderContainer(
         modifier = modifier
             .fillMaxSize()
             .background(OledBlack)
-            .onSizeChanged { containerSize = it }
             .pointerInput(Unit) {
                 var lastZoomTickStep = (currentZoom * 10f).roundToInt()
                 detectTransformGestures { _, _, zoom, _ ->
@@ -153,39 +146,6 @@ fun GXVViewfinderContainer(
                         onEvent(GXVcamEvent.OnZoomChanged(targetZoom))
                     }
                 }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offset ->
-                        focusPosition = offset
-                        focusEvSlider = 0f
-                        isEvExpanded = false
-                        lastVibratedIndex = 9 // reset to 0.0 EV
-                        showFocusRing = true
-                        if (containerSize.width > 0 && containerSize.height > 0) {
-                            onEvent(
-                                GXVcamEvent.OnTapToFocus(
-                                    x = offset.x,
-                                    y = offset.y,
-                                    width = containerSize.width,
-                                    height = containerSize.height
-                                )
-                            )
-                        }
-                    },
-                    onLongPress = { offset ->
-                        focusPosition = offset
-                        showFocusRing = true
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onEvent(
-                            GXVcamEvent.SetAeAfLock(
-                                locked = !anyLocked,
-                                x = offset.x,
-                                y = offset.y
-                            )
-                        )
-                    }
-                )
             },
         contentAlignment = Alignment.Center
     ) {
@@ -210,6 +170,54 @@ fun GXVViewfinderContainer(
                 .aspectRatio(animatedAspectRatio)
                 .clip(RoundedCornerShape(cornerRadius))
                 .clipToBounds()
+                .onSizeChanged { containerSize = it }
+                .pointerInput(Unit) {
+                    var lastZoomTickStep = (currentZoom * 10f).roundToInt()
+                    detectTransformGestures { _, _, zoom, _ ->
+                        if (zoom != 1f) {
+                            val targetZoom = (currentZoom * zoom).coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM)
+                            val step = (targetZoom * 10f).roundToInt()
+                            if (step != lastZoomTickStep) {
+                                tactile.triggerTick()
+                                lastZoomTickStep = step
+                            }
+                            onEvent(GXVcamEvent.OnZoomChanged(targetZoom))
+                        }
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { offset ->
+                            focusPosition = offset
+                            focusEvSlider = 0f
+                            isEvExpanded = false
+                            lastVibratedIndex = 9 // reset to 0.0 EV
+                            showFocusRing = true
+                            if (containerSize.width > 0 && containerSize.height > 0) {
+                                onEvent(
+                                    GXVcamEvent.OnTapToFocus(
+                                        x = offset.x,
+                                        y = offset.y,
+                                        width = containerSize.width,
+                                        height = containerSize.height
+                                    )
+                                )
+                            }
+                        },
+                        onLongPress = { offset ->
+                            focusPosition = offset
+                            showFocusRing = true
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onEvent(
+                                GXVcamEvent.SetAeAfLock(
+                                    locked = !anyLocked,
+                                    x = offset.x,
+                                    y = offset.y
+                                )
+                            )
+                        }
+                    )
+                }
         ) {
             // Camera Preview Content
             content()

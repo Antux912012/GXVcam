@@ -1,9 +1,6 @@
 package org.gxvcam.camera
 
 import android.hardware.camera2.CaptureRequest
-import android.media.AudioRecord
-import android.media.MicrophoneDirection
-import android.os.Build
 import android.util.Range
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.CaptureRequestOptions
@@ -22,9 +19,12 @@ object MotoVideoEngine {
         supportedKeyNames: Set<String> = emptySet()
     ) {
         // 1. Target AE FPS range (e.g. 30..30, 60..60, or 120..120)
+        // MediaTek Dimensity 7300 supports up to 30fps for 4K UHD and dual concurrent capture
+        val maxFps = if (settings.isDualCaptureEnabled || settings.resolution == org.gxvcam.ui.state.VideoResolution.UHD_4K) 30 else settings.frameRate.fps
+        val targetFps = minOf(settings.frameRate.fps, maxFps)
         builder.setCaptureRequestOption(
             CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-            Range(settings.frameRate.fps, settings.frameRate.fps)
+            Range(targetFps, targetFps)
         )
 
         // 2. Motorola Video Night Vision (low-light boost for Dimensity ISP)
@@ -42,7 +42,8 @@ object MotoVideoEngine {
         setIfSupported(builder, MtkMotoVendorTags.MOTO_IS_DUAL_CAPTURE, dualVal, supportedKeyNames)
         setIfSupported(builder, MtkMotoVendorTags.MTK_PIP_DEVICES, dualVal, supportedKeyNames)
 
-        // 4. Motorola Edge 50 Neo Stabilization Pipeline (OIS + Smart EIS + 360° Horizon Lock)
+        // 5. Motorola Edge 50 Neo Stabilization Pipeline (OIS + Smart EIS + 360° Horizon Lock)
+        // Android minSdk = 34 guarantees PREVIEW_STABILIZATION support
         when (settings.stabilization) {
             MotoVideoStabilization.OFF -> {
                 builder.setCaptureRequestOption(
@@ -61,17 +62,10 @@ object MotoVideoEngine {
                     CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
                     CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
                 )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    builder.setCaptureRequestOption(
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
-                    )
-                } else {
-                    builder.setCaptureRequestOption(
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON
-                    )
-                }
+                builder.setCaptureRequestOption(
+                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
+                )
                 setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_SMARTEIS, 1, supportedKeyNames)
                 setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_IHC, 0, supportedKeyNames)
             }
@@ -80,17 +74,10 @@ object MotoVideoEngine {
                     CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
                     CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
                 )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    builder.setCaptureRequestOption(
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
-                    )
-                } else {
-                    builder.setCaptureRequestOption(
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON
-                    )
-                }
+                builder.setCaptureRequestOption(
+                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
+                )
                 // IHC = In-Hardware Horizon Correction (360° horizon lock)
                 setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_SMARTEIS, 1, supportedKeyNames)
                 setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_IHC, 1, supportedKeyNames)
@@ -107,28 +94,6 @@ object MotoVideoEngine {
     ) {
         if (key != null && (supportedKeyNames.isEmpty() || supportedKeyNames.contains(key.name))) {
             builder.setCaptureRequestOption(key, value)
-        }
-    }
-
-    fun applyMicrophoneAudioZoom(
-        audioRecord: AudioRecord?,
-        isEnabled: Boolean,
-        zoomRatio: Float,
-        isBackCamera: Boolean = true
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isEnabled && audioRecord != null) {
-            try {
-                val direction = if (isBackCamera) {
-                    MicrophoneDirection.MIC_DIRECTION_AWAY_FROM_USER
-                } else {
-                    MicrophoneDirection.MIC_DIRECTION_TOWARDS_USER
-                }
-                audioRecord.setPreferredMicrophoneDirection(direction)
-                val fieldDimension = ((zoomRatio - 1.0f) / 9.0f).coerceIn(0f, 1f)
-                audioRecord.setPreferredMicrophoneFieldDimension(fieldDimension)
-            } catch (_: Exception) {
-                // Device may not support directional mic API
-            }
         }
     }
 }

@@ -108,8 +108,8 @@ enum class DualCaptureLayout(val label: String) {
 
 @Immutable
 data class MotoVideoSettings(
-    val resolution: VideoResolution = VideoResolution.UHD_4K,
-    val frameRate: VideoFrameRate = VideoFrameRate.FPS_60,
+    val resolution: VideoResolution = VideoResolution.FHD_1080P,
+    val frameRate: VideoFrameRate = VideoFrameRate.FPS_30,
     val stabilization: MotoVideoStabilization = MotoVideoStabilization.ADAPTIVE,
     val isNightVisionVideoEnabled: Boolean = false,
     val isHdr10BitEnabled: Boolean = false,
@@ -222,13 +222,7 @@ enum class AgcColorProfile(
         rGain = 1.0f,
         gGain = 1.0f,
         bGain = 1.0f
-    );
-
-    companion object {
-        val AGC_LEICA_AUTHENTIC get() = LEICA_AUTHENTIC
-        val AGC_LEICA_VIBRANT get() = LEICA_VIBRANT
-        val MOTO_VIVID get() = VIVO_VIVID
-    }
+    )
 }
 
 @Immutable
@@ -356,7 +350,7 @@ data class CameraManualSettings(
     val isHorizonLevelVisible: Boolean = true,
     val gridType: GridType = GridType.RULE_OF_THIRDS,
     val proLayoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
-    val accentTheme: AccentTheme = AccentTheme.PANTONE_POINCIANA,
+    val accentTheme: AccentTheme = AccentTheme.DYNAMIC_SYSTEM,
 )
 
 @Immutable

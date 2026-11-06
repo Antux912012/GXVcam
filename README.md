@@ -19,14 +19,15 @@ See [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) for the limits on r
 ## Download & Releases
 
 Pre-built APKs are available under GitHub Releases:
-* [**Download latest GXVcam APK (v0.3.0)**](https://github.com/Antux912012/GXVcam/releases/download/v0.3.0/GXVcam-v0.3.0.apk)
+* [**Download latest GXVcam APK (v0.3.1)**](https://github.com/Antux912012/GXVcam/releases/download/v0.3.1/GXVcam-v0.3.1.apk)
 
 ## Features & Status
 
 | Area | State | Highlights |
 | :--- | :--- | :--- |
+| **Codebase Audit & Hardening (v0.3.1)** | ✅ Clean Architecture & Security Hardened | Complete audit eliminating duplicate legacy controllers (`Camera2Controller`), dead classes (`CameraDeviceConfig`, unreferenced `CameraScreen`), dead methods & imports; removed obsolete `Build.VERSION` checks for modern `minSdk 34`; migrated to `androidx.exifinterface` 1.4.2; hardened security (`allowBackup=false`, scoped intent URI permissions). |
 | **Continuous Smooth Zoom (up to 20x)** | ✅ iPhone / Vivo / MotCamera5 Smooth SAT | Continuous micrometric zoom from **0.6x to 20.0x** with intermediate steps (1.1x, 1.2x, 1.5x...); seamless **Spatial Alignment & Transition (SAT)** via MediaTek Logical Camera ID 5 transitioning smoothly across physical sensors (Ultra-Wide 16mm, Main Wide 24mm, In-Sensor Crop 48mm, and 3x Optical Telephoto 73mm) with **zero preview freeze or flicker**; **Interactive Precision Zoom Ruler** with Canvas ticks, single-step `−`/`+` micro-steppers, quick-jump chips (`.6`, `1.0`, `1.2`, `1.5`, `2.0`, `3.0`, `5.0`, `10x`, `20x`), active focal length in mm, and **Niagara-style LRA haptic ticks** (`EFFECT_TICK` on every 0.1x and `EFFECT_CLICK` on optical stops) |
-| **PIP Video & Dual Capture** | ✅ Complete MotCamera5 Dual-View Parity | Simultaneous front (32MP Samsung S5KJD1) and rear (50MP Sony IMX896) camera concurrent recording; **Draggable Picture-in-Picture (PIP)** floating window with rounded corners and drop shadow; **50:50 Split-Screen** mode with central divider; **Instant Camera Swap (`⇄`)** flipping primary and secondary feeds on the fly; Dispatched Motorola OEM HAL vendor tags (`is_dual_capture`, `pipzoomratio`, and `com.mediatek.streamingfeature.pipDevices`) |
+| **PIP & Dual Capture (Photo & Video)** | ✅ Complete MotCamera5 Dual-View Parity | Simultaneous front (32MP Samsung S5KJD1) and rear (50MP Sony IMX896) camera concurrent capture in **both Photo and Video modes**; **Draggable Picture-in-Picture (PIP)** floating window with rounded corners and drop shadow; **50:50 Split-Screen** mode with central divider; **Instant Camera Swap (`⇄`)** flipping primary and secondary feeds on the fly; High-res compositing of secondary feed into captured photos and 1080p concurrent video recording; Dispatched Motorola OEM HAL vendor tags (`is_dual_capture`, `pipzoomratio`, and `com.mediatek.streamingfeature.pipDevices`) |
 | **Motorola Camera 5 Video Suite** | ✅ Complete Edge 50 Neo OEM Parity | **4K UHD** (3840×2160), **1080p FHD**, and **720p HD** resolution selector; **30fps**, **60fps**, and **120fps Slow-Mo**; Motorola Video Stabilization (**Adaptive OIS+EIS** via `vstab_smarteis_enable`, **360° Horizon Lock** via `vstab_ihc_enable`, Off); **Video Night Vision** (`VideoNVwithoutVstab`); **HDR10+ 10-bit HLG** (`hdr10_mode_tuning`, `3d_hdr_mode`); and **Directional Audio Zoom** tracking lens zoom ratio |
 | **Gravity Sensor & Photo Orientation** | ✅ Google Photos Aligned | Dynamic gravity-sensor orientation listener mapping device tilt to `targetRotation` with physical bitmap rotation (90° portrait / horizontal landscape) and normalized EXIF orientation (`ORIENTATION_NORMAL = 1`), guaranteeing photos shot horizontally appear horizontal in Google Photos and galleries with zero rotation errors |
 | **Multi-Camera & Aux Sensors** | ✅ Verified on Edge 50 Neo | Bypasses `vendor.camera.aux.packagelist` to expose & bind Camera 0 (Main 50MP Sony IMX896), Camera 2 (13MP GalaxyCore GC13A2 Ultra-Wide 0.6x), Camera 3 (10MP Samsung S5K3K1 Telephoto 3x), and Camera 5 (Logical multi-camera) |
@@ -74,3 +75,10 @@ python3 tools/mtk_camera_probe.py --from-file tools/testdata/dumpsys_sample.txt 
 
 JDK 17, Android SDK (platform 35, build-tools 35), NDK r27+, CMake 3.22+, Android Studio
 (or cmdline-tools + Gradle wrapper), `glslc` (ships with the NDK) for shaders.
+
+## License
+
+GXVcam is dual-licensed:
+* **Core Codebase & Hardware Engine**: [MIT License](LICENSE) (`cpp/`, `camera/`, `sensors/`, `configs/`, `tools/`).
+* **User Interface**: [GNU General Public License v3.0 (GPLv3)](LICENSE) (`ui/`).
+

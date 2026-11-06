@@ -548,6 +548,84 @@ fun CameraSettingsBottomSheet(
                     SensorSpecRow(label = "Image Processor", value = "MediaTek Dimensity 7300 Imagiq 950")
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // SECTION 4: About GXVcam & Dual Licensing
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            SettingsSectionHeader(
+                icon = Icons.Default.Camera,
+                title = "About GXVcam",
+            )
+
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "GXVcam",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Version 0.3.1 • Created by Antonio",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                try {
+                                    uriHandler.openUri("https://github.com/Antux912012/GXVcam")
+                                } catch (_: Exception) {}
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Code,
+                                contentDescription = "GitHub",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("GitHub", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    Text(
+                        text = "Dual Licensing Architecture",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    SensorSpecRow(label = "Core Engine & HAL", value = "MIT License (cpp, camera, sensors)")
+                    SensorSpecRow(label = "Compose UI & Deck", value = "GNU GPLv3 (ui package)")
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    Text(
+                        text = "Hardware & Platform Requirements",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    SensorSpecRow(label = "Android Target", value = "Android 14+ / Android 16 (API 34–36)")
+                    SensorSpecRow(label = "Camera2 Hardware", value = "Level 3 / Full + Logical Multi-Cam (ID 5)")
+                    SensorSpecRow(label = "Target Platform", value = "Motorola Edge 50 Neo (Dimensity 7300)")
+                }
+            }
         }
     }
 }

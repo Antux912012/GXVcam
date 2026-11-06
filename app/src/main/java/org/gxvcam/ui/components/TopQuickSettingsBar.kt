@@ -41,7 +41,6 @@ fun TopQuickSettingsBar(
     recordingDurationMs: Long,
     onCycleFlash: () -> Unit,
     onCycleAspectRatio: () -> Unit,
-    onToggleGrid: () -> Unit,
     onSelectGrid: (GridType) -> Unit = {},
     onSelectProfile: (AgcColorProfile) -> Unit = {},
     onToggleAeLock: () -> Unit = {},
@@ -54,6 +53,8 @@ fun TopQuickSettingsBar(
     isRawSupported: Boolean = false,
     captureFormat: CaptureFormat = CaptureFormat.JPEG,
     onCycleCaptureFormat: () -> Unit = {},
+    isDualCaptureEnabled: Boolean = false,
+    onToggleDualCapture: () -> Unit = {},
     isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -456,7 +457,7 @@ fun TopQuickSettingsBar(
                             .background(Color.White)
                     )
                     Text(
-                        text = String.format("%02d:%02d", minutes, seconds),
+                        text = String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds),
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
@@ -508,11 +509,29 @@ fun TopQuickSettingsBar(
             }
         }
 
-        // Right Group: Sony Alpha Grid Menu & Camera Settings
+        // Right Group: Dual Cam Toggle, Sony Alpha Grid Menu & Camera Settings
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Dual Cam PIP Toggle Button
+            FilledTonalIconButton(
+                onClick = onToggleDualCapture,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (isDualCaptureEnabled) MaterialTheme.colorScheme.primaryContainer else buttonContainerColor,
+                    contentColor = if (isDualCaptureEnabled) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                ),
+                modifier = Modifier
+                    .size(40.dp)
+                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PictureInPicture,
+                    contentDescription = "Dual Capture PIP",
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+
             // Sony Alpha Composition Grid Dropdown Button
             Box {
                 FilledTonalIconButton(

@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
 
                     GXVcamScreen(
                         viewModel = gxvViewModel,
-                        onOpenGallery = { openGallery() },
+                        onOpenGallery = { openGallery(uiState.lastCapturedUri) },
                         viewfinderContent = {
                             AndroidView(
                                 factory = { _ ->
@@ -126,7 +126,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openGallery() {
+    private fun openGallery(lastCapturedUri: android.net.Uri? = null) {
+        if (lastCapturedUri != null) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(lastCapturedUri, "image/*")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                return
+            } catch (_: Exception) {}
+        }
+
         try {
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 type = "image/*"

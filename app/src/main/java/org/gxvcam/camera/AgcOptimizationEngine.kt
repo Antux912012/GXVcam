@@ -1,15 +1,11 @@
 package org.gxvcam.camera
 
 import android.hardware.camera2.CaptureRequest
-import android.hardware.camera2.params.TonemapCurve
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
-import androidx.compose.ui.graphics.ColorMatrix
-import org.gxvcam.ui.state.AgcColorProfile
 import org.gxvcam.ui.state.AgcLibPatcherSettings
 import org.gxvcam.ui.state.OpticalLens
-import kotlin.math.pow
 
 object AgcOptimizationEngine {
 
@@ -86,30 +82,5 @@ object AgcOptimizationEngine {
         }
 
         return builder.build()
-    }
-
-    private fun buildTonemapCurve(contrast: Float): TonemapCurve {
-        val numPoints = 16
-        val curve = FloatArray(numPoints * 2)
-        val exponent = contrast.coerceIn(0.5f, 2.0f)
-
-        for (i in 0 until numPoints) {
-            val x = i.toFloat() / (numPoints - 1).toFloat()
-            val y = if (x < 0.5f) {
-                0.5f * (2f * x).pow(exponent)
-            } else {
-                1.0f - 0.5f * (2f * (1f - x)).pow(exponent)
-            }
-            curve[i * 2] = x
-            curve[i * 2 + 1] = y.coerceIn(0f, 1f)
-        }
-
-        return TonemapCurve(curve, curve, curve)
-    }
-
-    fun createColorMatrixFilter(profile: AgcColorProfile): ColorMatrix {
-        return ColorMatrix().apply {
-            setToSaturation(profile.saturationBoost)
-        }
     }
 }

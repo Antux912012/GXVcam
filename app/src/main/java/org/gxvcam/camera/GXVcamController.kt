@@ -1,8 +1,10 @@
 package org.gxvcam.camera
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.RenderEffect
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -151,6 +153,9 @@ class GXVcamController(
         private set
 
     private var activeRecording: Recording? = null
+    private var lastWasDualCapture: Boolean = false
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingBindRunnable: Runnable? = null
 
     var deviceSurfaceRotation: Int = Surface.ROTATION_0
         private set
@@ -202,7 +207,13 @@ class GXVcamController(
 
     fun updateVideoCapture(settings: MotoVideoSettings = currentVideoSettings) {
         this.currentVideoSettings = settings
-        val quality = when (settings.resolution) {
+        // Fallback dual capture concurrent recording to 1080p FHD to stay within MediaTek Dimensity 7300 HAL encoder limits
+        val effectiveRes = if (settings.isDualCaptureEnabled && settings.resolution == VideoResolution.UHD_4K) {
+            VideoResolution.FHD_1080P
+        } else {
+            settings.resolution
+        }
+        val quality = when (effectiveRes) {
             VideoResolution.UHD_4K -> Quality.UHD
             VideoResolution.FHD_1080P -> Quality.FHD
             VideoResolution.HD_720P -> Quality.HD
@@ -239,7 +250,7 @@ class GXVcamController(
         activeLens: OpticalLens = OpticalLens.MAIN_1X,
         cameraMode: CameraMode = CameraMode.PHOTO,
         displayZoom: Float = activeLens.zoomRatio,
-        isDualCapture: Boolean = isVideoMode && currentVideoSettings.isDualCaptureEnabled,
+        isDualCapture: Boolean = (isVideoMode || cameraMode == CameraMode.PHOTO) && currentVideoSettings.isDualCaptureEnabled,
         isDualCaptureSwapped: Boolean = currentVideoSettings.isDualCaptureSwapped,
     ) {
         this.currentActiveLens = activeLens
@@ -261,156 +272,201 @@ class GXVcamController(
                 cameraProvider = future.get()
                 val provider = cameraProvider ?: return@addListener
 
+                val wasDual = lastWasDualCapture
+                val isDual = isDualCapture
+                this.lastWasDualCapture = isDual
+                val needsTransitionDelay = (wasDual != isDual)
+
                 provider.unbindAll()
                 isConcurrentCameraActive = false
                 secondaryCamera = null
                 secondaryPreview = null
                 concurrentCamera = null
+                camera = null
 
-                val targetRatio = when (aspectRatio) {
-                    AspectRatio.RATIO_16_9,
-                    AspectRatio.RATIO_21_9 -> androidx.camera.core.AspectRatio.RATIO_16_9
-                    AspectRatio.RATIO_4_3,
-                    AspectRatio.RATIO_1_1,
-                    AspectRatio.RATIO_3_2 -> androidx.camera.core.AspectRatio.RATIO_4_3
+                pendingBindRunnable?.let { mainHandler.removeCallbacks(it) }
+
+                val targetRatio = if (isVideoMode) {
+                    androidx.camera.core.AspectRatio.RATIO_16_9
+                } else {
+                    when (aspectRatio) {
+                        AspectRatio.RATIO_16_9,
+                        AspectRatio.RATIO_21_9 -> androidx.camera.core.AspectRatio.RATIO_16_9
+                        AspectRatio.RATIO_4_3,
+                        AspectRatio.RATIO_1_1,
+                        AspectRatio.RATIO_3_2 -> androidx.camera.core.AspectRatio.RATIO_4_3
+                    }
                 }
 
-                // Motorola Edge 50 Neo Dual Capture Concurrent Camera (Rear + Front)
-                if (isDualCapture && isVideoMode) {
+                val bindAction = Runnable {
+                    val activeProvider = cameraProvider ?: return@Runnable
                     try {
-                        val rearResolved = resolveCamera(provider, isBackCamera = true, activeLens)
-                        val rearSelector = rearResolved.selector
-                        val frontSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+                        // Motorola Edge 50 Neo Dual Capture Concurrent Camera (Rear + Front in both Photo & Video modes)
+                        if (isDualCapture) {
+                            try {
+                                val concurrentCombos = activeProvider.availableConcurrentCameraInfos
+                                Log.i(TAG, "Concurrent combos from CameraX: ${concurrentCombos.map { list -> list.map { runCatching { Camera2CameraInfo.from(it).cameraId }.getOrNull() } }}")
 
-                        val (firstSelector, secondSelector) = if (!isDualCaptureSwapped) {
-                            rearSelector to frontSelector
-                        } else {
-                            frontSelector to rearSelector
+                                val combo = concurrentCombos.firstOrNull() ?: emptyList()
+                                val backInfo = combo.firstOrNull { it.lensFacing == CameraSelector.LENS_FACING_BACK }
+                                val frontInfo = combo.firstOrNull { it.lensFacing == CameraSelector.LENS_FACING_FRONT }
+
+                                val rearSelector = backInfo?.cameraSelector ?: CameraSelector.DEFAULT_BACK_CAMERA
+                                val frontSelector = frontInfo?.cameraSelector ?: CameraSelector.DEFAULT_FRONT_CAMERA
+
+                                val (firstSelector, secondSelector) = if (!isDualCaptureSwapped) {
+                                    rearSelector to frontSelector
+                                } else {
+                                    frontSelector to rearSelector
+                                }
+
+                                val primaryPreview = Preview.Builder()
+                                    .setTargetAspectRatio(targetRatio)
+                                    .setTargetRotation(deviceSurfaceRotation)
+                                    .build().apply {
+                                        setSurfaceProvider(previewView.surfaceProvider)
+                                    }
+
+                                val secPreview = Preview.Builder()
+                                    .setTargetAspectRatio(targetRatio)
+                                    .setTargetRotation(deviceSurfaceRotation)
+                                    .build().apply {
+                                        setSurfaceProvider(secondaryPreviewView.surfaceProvider)
+                                    }
+
+                                this.preview = primaryPreview
+                                this.secondaryPreview = secPreview
+
+                                val primaryGroupBuilder = UseCaseGroup.Builder().addUseCase(primaryPreview)
+                                if (isVideoMode) {
+                                    updateVideoCapture(currentVideoSettings)
+                                    videoCapture?.targetRotation = deviceSurfaceRotation
+                                    videoCapture?.let { primaryGroupBuilder.addUseCase(it) }
+                                    imageCapture = null
+                                    imageAnalysis = null
+                                } else {
+                                    val imgCap = ImageCapture.Builder()
+                                        .setTargetAspectRatio(targetRatio)
+                                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                                        .setTargetRotation(deviceSurfaceRotation)
+                                        .build()
+                                    this.imageCapture = imgCap
+                                    primaryGroupBuilder.addUseCase(imgCap)
+                                    imageAnalysis = null
+                                }
+
+                                val primaryGroup = primaryGroupBuilder.build()
+                                val secondaryGroup = UseCaseGroup.Builder()
+                                    .addUseCase(secPreview)
+                                    .build()
+
+                                val firstConfig = ConcurrentCamera.SingleCameraConfig(firstSelector, primaryGroup, owner)
+                                val secondConfig = ConcurrentCamera.SingleCameraConfig(secondSelector, secondaryGroup, owner)
+
+                                val concurrentCam = activeProvider.bindToLifecycle(listOf(firstConfig, secondConfig))
+                                camera = concurrentCam.cameras.firstOrNull()
+                                secondaryCamera = concurrentCam.cameras.getOrNull(1)
+                                concurrentCamera = concurrentCam
+                                isConcurrentCameraActive = true
+
+                                applyMotoVideoSettings(currentVideoSettings, zoomRatio = activeLens.zoomRatio)
+                                readHardwareCapabilities()
+                                return@Runnable
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Concurrent camera binding failed, falling back to single camera: ${e.message}", e)
+                                isConcurrentCameraActive = false
+                                secondaryCamera = null
+                                secondaryPreview = null
+                                concurrentCamera = null
+                            }
                         }
 
-                        val primaryPreview = Preview.Builder()
+                        val resolved = resolveCamera(activeProvider, isBackCamera, activeLens)
+                        val baseSelector = resolved.selector
+
+                        // Night Vision extension if requested and available on this lens
+                        val selector = if ((cameraMode == CameraMode.NIGHT) && !isVideoMode) {
+                            val extensionsManagerFuture = ExtensionsManager.getInstanceAsync(context, activeProvider)
+                            val extensionsManager = try {
+                                extensionsManagerFuture.get(400, TimeUnit.MILLISECONDS)
+                            } catch (_: Exception) {
+                                null
+                            }
+                            if (extensionsManager != null && extensionsManager.isExtensionAvailable(baseSelector, ExtensionMode.NIGHT)) {
+                                Log.i(TAG, "Enabling OEM Night Vision Extension")
+                                extensionsManager.getExtensionEnabledCameraSelector(baseSelector, ExtensionMode.NIGHT)
+                            } else {
+                                baseSelector
+                            }
+                        } else {
+                            baseSelector
+                        }
+
+                        preview = Preview.Builder()
                             .setTargetAspectRatio(targetRatio)
-                            .setTargetRotation(deviceSurfaceRotation)
                             .build().apply {
                                 setSurfaceProvider(previewView.surfaceProvider)
                             }
 
-                        val secPreview = Preview.Builder()
-                            .setTargetAspectRatio(targetRatio)
-                            .setTargetRotation(deviceSurfaceRotation)
-                            .build().apply {
-                                setSurfaceProvider(secondaryPreviewView.surfaceProvider)
+                        val useCases = mutableListOf<UseCase>(preview!!)
+
+                        if (isVideoMode) {
+                            updateVideoCapture(currentVideoSettings)
+                            videoCapture?.targetRotation = deviceSurfaceRotation
+                            videoCapture?.let { useCases.add(it) }
+                            imageCapture = null
+                            imageAnalysis = null
+                        } else {
+                            val imageCaptureBuilder = ImageCapture.Builder()
+                                .setTargetAspectRatio(targetRatio)
+                                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                                .setTargetRotation(deviceSurfaceRotation)
+                            imageCapture = imageCaptureBuilder.build()
+                            useCases.add(imageCapture!!)
+
+                            if (enableHistogram) {
+                                imageAnalysis = ImageAnalysis.Builder()
+                                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                                    .build().apply {
+                                        setAnalyzer(cameraExecutor, HistogramAnalyzer { histogram ->
+                                            onHistogramReady?.invoke(histogram)
+                                            onEvent?.invoke(GXVcamEvent.UpdateHistogram(histogram))
+                                        })
+                                    }
+                                useCases.add(imageAnalysis!!)
+                            } else {
+                                imageAnalysis = null
                             }
+                        }
 
-                        this.preview = primaryPreview
-                        this.secondaryPreview = secPreview
+                        camera = activeProvider.bindToLifecycle(
+                            owner,
+                            selector,
+                            *useCases.toTypedArray()
+                        )
+                        boundCameraId = resolved.cameraId
+                        isPhysicalLensBinding = resolved.isPhysicalLens
+                        boundSensorBaseZoom = if (resolved.isPhysicalLens) activeLens.sensorBaseZoom else 1.0f
 
-                        videoCapture?.targetRotation = deviceSurfaceRotation
-                        val primaryGroup = UseCaseGroup.Builder()
-                            .addUseCase(primaryPreview)
-                            .apply {
-                                videoCapture?.let { addUseCase(it) }
-                            }
-                            .build()
-
-                        val secondaryGroup = UseCaseGroup.Builder()
-                            .addUseCase(secPreview)
-                            .build()
-
-                        val firstConfig = ConcurrentCamera.SingleCameraConfig(firstSelector, primaryGroup, owner)
-                        val secondConfig = ConcurrentCamera.SingleCameraConfig(secondSelector, secondaryGroup, owner)
-
-                        val concurrentCam = provider.bindToLifecycle(listOf(firstConfig, secondConfig))
-                        camera = concurrentCam.cameras.firstOrNull()
-                        secondaryCamera = concurrentCam.cameras.getOrNull(1)
-                        concurrentCamera = concurrentCam
-                        isConcurrentCameraActive = true
-
-                        applyMotoVideoSettings(currentVideoSettings, zoomRatio = activeLens.zoomRatio)
                         readHardwareCapabilities()
-                        return@addListener
+                        applyStabilization(isVideoMode)
+                        applyLensConfiguration(activeLens, displayZoom)
+                        applyManualSettings(currentManualSettings)
                     } catch (e: Exception) {
-                        Log.w(TAG, "Concurrent camera binding failed, falling back to single camera: ${e.message}", e)
-                        isConcurrentCameraActive = false
-                        secondaryCamera = null
-                        secondaryPreview = null
-                        concurrentCamera = null
+                        Log.e(TAG, "Use case binding failed: ${e.message}", e)
                     }
                 }
 
-                val resolved = resolveCamera(provider, isBackCamera, activeLens)
-                val baseSelector = resolved.selector
-
-                // Night Vision extension if requested and available on this lens
-                val selector = if ((cameraMode == CameraMode.NIGHT) && !isVideoMode) {
-                    val extensionsManagerFuture = ExtensionsManager.getInstanceAsync(context, provider)
-                    val extensionsManager = try {
-                        extensionsManagerFuture.get(400, TimeUnit.MILLISECONDS)
-                    } catch (_: Exception) {
-                        null
-                    }
-                    if (extensionsManager != null && extensionsManager.isExtensionAvailable(baseSelector, ExtensionMode.NIGHT)) {
-                        Log.i(TAG, "Enabling OEM Night Vision Extension")
-                        extensionsManager.getExtensionEnabledCameraSelector(baseSelector, ExtensionMode.NIGHT)
-                    } else {
-                        baseSelector
-                    }
+                pendingBindRunnable = bindAction
+                if (needsTransitionDelay) {
+                    Log.i(TAG, "Transitioning camera mode (dual=$isDual, wasDual=$wasDual): pausing 250ms for HAL cleanup")
+                    mainHandler.postDelayed(bindAction, 250L)
                 } else {
-                    baseSelector
+                    bindAction.run()
                 }
-
-                preview = Preview.Builder()
-                    .setTargetAspectRatio(targetRatio)
-                    .build().apply {
-                        setSurfaceProvider(previewView.surfaceProvider)
-                    }
-
-                val useCases = mutableListOf<UseCase>(preview!!)
-
-                if (isVideoMode) {
-                    videoCapture?.targetRotation = deviceSurfaceRotation
-                    useCases.add(videoCapture!!)
-                    imageCapture = null
-                    imageAnalysis = null
-                } else {
-                    val imageCaptureBuilder = ImageCapture.Builder()
-                        .setTargetAspectRatio(targetRatio)
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                        .setTargetRotation(deviceSurfaceRotation)
-                    imageCapture = imageCaptureBuilder.build()
-                    useCases.add(imageCapture!!)
-
-                    if (enableHistogram) {
-                        imageAnalysis = ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
-                            .build().apply {
-                                setAnalyzer(cameraExecutor, HistogramAnalyzer { histogram ->
-                                    onHistogramReady?.invoke(histogram)
-                                    onEvent?.invoke(GXVcamEvent.UpdateHistogram(histogram))
-                                })
-                            }
-                        useCases.add(imageAnalysis!!)
-                    } else {
-                        imageAnalysis = null
-                    }
-                }
-
-                camera = provider.bindToLifecycle(
-                    owner,
-                    selector,
-                    *useCases.toTypedArray()
-                )
-                boundCameraId = resolved.cameraId
-                isPhysicalLensBinding = resolved.isPhysicalLens
-                boundSensorBaseZoom = if (resolved.isPhysicalLens) activeLens.sensorBaseZoom else 1.0f
-
-                readHardwareCapabilities()
-                applyStabilization(isVideoMode)
-                applyLensConfiguration(activeLens, displayZoom)
-                applyManualSettings(currentManualSettings)
             } catch (e: Exception) {
-                Log.e(TAG, "Use case binding failed: ${e.message}", e)
+                Log.e(TAG, "Camera provider initialization failed: ${e.message}", e)
             }
         }, ContextCompat.getMainExecutor(context))
     }
@@ -729,24 +785,22 @@ class GXVcamController(
                 (settings.isDualCaptureSwapped != previousDualCaptureSwapped)
 
         if (needsRebind) {
-            if (settings.resolution != previousResolution) {
+            if (settings.resolution != previousResolution || settings.isDualCaptureEnabled != previousDualCapture) {
                 updateVideoCapture(settings)
             }
-            if (lastBindConfig?.isVideoMode == true) {
-                lastBindConfig?.let { cfg ->
-                    bindCamera(
-                        isBackCamera = cfg.isBackCamera,
-                        aspectRatio = cfg.aspectRatio,
-                        enableHistogram = cfg.enableHistogram,
-                        enableRawJpeg = cfg.enableRawJpeg,
-                        isVideoMode = true,
-                        activeLens = currentActiveLens,
-                        cameraMode = cfg.cameraMode,
-                        displayZoom = currentActiveLens.zoomRatio,
-                        isDualCapture = settings.isDualCaptureEnabled,
-                        isDualCaptureSwapped = settings.isDualCaptureSwapped,
-                    )
-                }
+            lastBindConfig?.let { cfg ->
+                bindCamera(
+                    isBackCamera = cfg.isBackCamera,
+                    aspectRatio = cfg.aspectRatio,
+                    enableHistogram = cfg.enableHistogram,
+                    enableRawJpeg = cfg.enableRawJpeg,
+                    isVideoMode = cfg.isVideoMode,
+                    activeLens = currentActiveLens,
+                    cameraMode = cfg.cameraMode,
+                    displayZoom = currentActiveLens.zoomRatio,
+                    isDualCapture = settings.isDualCaptureEnabled,
+                    isDualCaptureSwapped = settings.isDualCaptureSwapped,
+                )
             }
         }
 
@@ -1015,6 +1069,16 @@ class GXVcamController(
         val jpegQuality = currentManualSettings.jpegQuality
         val ratio = lastBindConfig?.aspectRatio ?: AspectRatio.RATIO_4_3
 
+        // Grab secondary preview frame on the UI thread at the instant of shutter tap
+        val secBitmap = if (isConcurrentCameraActive) {
+            try {
+                secondaryPreviewView.bitmap
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to capture secondary preview frame for dual capture: ${e.message}")
+                null
+            }
+        } else null
+
         capture.takePicture(
             cameraExecutor,
             object : ImageCapture.OnImageCapturedCallback() {
@@ -1073,7 +1137,10 @@ class GXVcamController(
                                 aspectRatio = ratio,
                                 colorSpace = colorSpace,
                                 jpegQuality = jpegQuality,
-                                rotationDegrees = rotationDegrees
+                                rotationDegrees = rotationDegrees,
+                                secondaryBitmap = secBitmap,
+                                dualCaptureLayout = currentVideoSettings.dualCaptureLayout,
+                                isDualCaptureSwapped = currentVideoSettings.isDualCaptureSwapped
                             )
 
                             val contentValues = ContentValues().apply {
@@ -1126,15 +1193,20 @@ class GXVcamController(
 
     @SuppressLint("MissingPermission")
     fun toggleVideoRecording() {
-        val video = videoCapture ?: return
+        val video = videoCapture ?: run {
+            Log.e(TAG, "toggleVideoRecording failed: videoCapture is null")
+            return
+        }
 
         if (activeRecording != null) {
+            Log.i(TAG, "Stopping active video recording session...")
             activeRecording?.stop()
             activeRecording = null
             onEvent?.invoke(GXVcamEvent.SetRecordingState(isRecording = false))
             return
         }
 
+        Log.i(TAG, "Starting video recording... isDualCapture=$isConcurrentCameraActive, resolution=${currentVideoSettings.resolution.label}")
         val timestamp = System.currentTimeMillis()
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "GXV_VID_$timestamp.mp4")
@@ -1148,29 +1220,46 @@ class GXVcamController(
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         ).setContentValues(contentValues).build()
 
-        val pendingRecording = video.output.prepareRecording(context, mediaStoreOutput)
-            .withAudioEnabled()
+        var pendingRecording = video.output.prepareRecording(context, mediaStoreOutput)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            pendingRecording = pendingRecording.withAudioEnabled()
+        } else {
+            Log.w(TAG, "RECORD_AUDIO permission not granted; recording muted video")
+        }
 
-        onEvent?.invoke(GXVcamEvent.SetRecordingState(true))
-
-        activeRecording = pendingRecording.start(ContextCompat.getMainExecutor(context)) { event ->
-            when (event) {
-                is VideoRecordEvent.Status -> {
-                    val durationMs = event.recordingStats.recordedDurationNanos / 1_000_000L
-                    onEvent?.invoke(GXVcamEvent.OnRecordingDurationUpdated(durationMs))
-                }
-                is VideoRecordEvent.Finalize -> {
-                    activeRecording = null
-                    onEvent?.invoke(GXVcamEvent.SetRecordingState(false))
-                    if (!event.hasError()) {
-                        onEvent?.invoke(GXVcamEvent.OnPhotoCaptured(event.outputResults.outputUri))
+        try {
+            activeRecording = pendingRecording.start(ContextCompat.getMainExecutor(context)) { event ->
+                when (event) {
+                    is VideoRecordEvent.Start -> {
+                        Log.i(TAG, "Video recording started successfully")
+                        onEvent?.invoke(GXVcamEvent.SetRecordingState(true))
+                    }
+                    is VideoRecordEvent.Status -> {
+                        val durationMs = event.recordingStats.recordedDurationNanos / 1_000_000L
+                        onEvent?.invoke(GXVcamEvent.OnRecordingDurationUpdated(durationMs))
+                    }
+                    is VideoRecordEvent.Finalize -> {
+                        activeRecording = null
+                        onEvent?.invoke(GXVcamEvent.SetRecordingState(false))
+                        if (!event.hasError()) {
+                            val uri = event.outputResults.outputUri
+                            Log.i(TAG, "Video recorded successfully to $uri (${event.recordingStats.numBytesRecorded} bytes)")
+                            onEvent?.invoke(GXVcamEvent.OnPhotoCaptured(uri))
+                        } else {
+                            Log.e(TAG, "Video recording finalize error: ${event.error}, cause: ${event.cause?.message}", event.cause)
+                        }
                     }
                 }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start video recording: ${e.message}", e)
+            activeRecording = null
+            onEvent?.invoke(GXVcamEvent.SetRecordingState(false))
         }
     }
 
     fun release() {
+        pendingBindRunnable?.let { mainHandler.removeCallbacks(it) }
         orientationEventListener?.disable()
         cameraExecutor.shutdown()
         cameraProvider?.unbindAll()

@@ -32,7 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.graphics.Bitmap
-import android.os.Build
 import android.util.Size
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
@@ -127,17 +126,7 @@ fun BottomControlDeck(
                     if (lastCapturedUri != null) {
                         thumbnailBitmap = withContext(Dispatchers.IO) {
                             try {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    context.contentResolver.loadThumbnail(lastCapturedUri, Size(120, 120), null)
-                                } else {
-                                    @Suppress("DEPRECATION")
-                                    android.provider.MediaStore.Images.Thumbnails.getThumbnail(
-                                        context.contentResolver,
-                                        android.content.ContentUris.parseId(lastCapturedUri),
-                                        android.provider.MediaStore.Images.Thumbnails.MINI_KIND,
-                                        null
-                                    )
-                                }
+                                context.contentResolver.loadThumbnail(lastCapturedUri, Size(120, 120), null)
                             } catch (e: Exception) {
                                 null
                             }

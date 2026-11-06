@@ -1,15 +1,21 @@
 package org.gxvcam.ui.components
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,9 +37,11 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -47,7 +55,9 @@ import org.gxvcam.ui.state.GXVcamEvent
 import org.gxvcam.ui.state.GridType
 import org.gxvcam.ui.theme.GXVMotion
 import org.gxvcam.ui.theme.OledBlack
+import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
 
 @Composable
@@ -64,20 +74,62 @@ fun GXVViewfinderContainer(
     content: @Composable () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+
+    // Linear resonant actuator (LRA) hardware vibrator for Niagara Launcher style ratchet ticks
+    val vibrator = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vm?.defaultVibrator ?: (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    }
+
+    // Discrete 1/3 EV stops from +3.0 to -3.0 EV
+    val evSteps = remember {
+        listOf(
+            3.0f, 2.7f, 2.3f, 2.0f, 1.7f, 1.3f, 1.0f, 0.7f, 0.3f,
+            0.0f,
+            -0.3f, -0.7f, -1.0f, -1.3f, -1.7f, -2.0f, -2.3f, -2.7f, -3.0f
+        )
+    }
+
+    fun triggerNiagaraTick() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && vibrator?.hasVibrator() == true) {
+            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+        } else {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
 
     // Tap-to-focus indicator & AE/AF Lock state
     var focusPosition by remember { mutableStateOf<Offset?>(null) }
     var showFocusRing by remember { mutableStateOf(false) }
     var focusEvSlider by remember { mutableFloatStateOf(0f) }
+    var isEvExpanded by remember { mutableStateOf(false) }
+    var lastInteractionTime by remember { mutableLongStateOf(0L) }
+    var lastVibratedIndex by remember { mutableIntStateOf(9) } // 0.0 is index 9
+    var currentScrubY by remember { mutableFloatStateOf(0f) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
-    LaunchedEffect(focusPosition, isAeAfLocked) {
+    // Auto-dismiss focus ring if not locked and not scrubbing EV
+    LaunchedEffect(focusPosition, isAeAfLocked, isEvExpanded) {
         if (focusPosition != null) {
             showFocusRing = true
-            if (!isAeAfLocked) {
+            if (!isAeAfLocked && !isEvExpanded) {
                 delay(4000)
                 showFocusRing = false
             }
+        }
+    }
+
+    // Auto-collapse expanded EV bar after 3.0s of inactivity
+    LaunchedEffect(isEvExpanded, lastInteractionTime) {
+        if (isEvExpanded) {
+            delay(3200)
+            isEvExpanded = false
         }
     }
 
@@ -110,6 +162,8 @@ fun GXVViewfinderContainer(
                     onTap = { offset ->
                         focusPosition = offset
                         focusEvSlider = 0f
+                        isEvExpanded = false
+                        lastVibratedIndex = 9 // reset to 0.0 EV
                         showFocusRing = true
                         if (containerSize.width > 0 && containerSize.height > 0) {
                             onEvent(
@@ -273,7 +327,7 @@ fun GXVViewfinderContainer(
                 }
             }
 
-            // Professional Focus Reticle, AE/AF Lock & Vertical Exposure Slider
+            // Professional Focus Reticle, AE/AF Lock & Niagara Expandable Exposure Bar
             if (showFocusRing && focusPosition != null) {
                 val pos = focusPosition!!
                 val ringScale by animateFloatAsState(
@@ -284,8 +338,15 @@ fun GXVViewfinderContainer(
 
                 val density = LocalDensity.current
                 val ringHalfSizePx = with(density) { 38.dp.toPx() }
-                val sliderOffsetXPx = with(density) { 46.dp.toPx() }
-                val sliderOffsetYPx = with(density) { 55.dp.toPx() }
+
+                val isNearRightEdge = containerSize.width > 0 && pos.x > (containerSize.width * 0.72f)
+                val sliderOffsetXPx = with(density) {
+                    if (isNearRightEdge) {
+                        if (isEvExpanded) -135.dp.toPx() else -52.dp.toPx()
+                    } else {
+                        48.dp.toPx()
+                    }
+                }
 
                 val activeFocusColor = if (isAeAfLocked) Color(0xFFFFB74D) else MaterialTheme.colorScheme.primary
 
@@ -372,60 +433,227 @@ fun GXVViewfinderContainer(
                     }
                 }
 
-                // 3. Vertical Quick Exposure Bias Drag Slider (Adjacent to Focus Reticle)
-                var dragAccumulator by remember { mutableFloatStateOf(0f) }
+                // 3. Niagara Launcher-Style Expandable Exposure Compensation Bar
+                val animatedBarHeight by animateDpAsState(
+                    targetValue = if (isEvExpanded) 220.dp else 72.dp,
+                    animationSpec = GXVMotion.spatialBouncy(),
+                    label = "evBarHeight"
+                )
+                val animatedBarWidth by animateDpAsState(
+                    targetValue = if (isEvExpanded) 66.dp else 38.dp,
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    label = "evBarWidth"
+                )
+
+                val barHeightPx = with(density) { animatedBarHeight.toPx() }
+                val clampedOffsetY = if (containerSize.height > 0) {
+                    (pos.y - barHeightPx / 2f).coerceIn(
+                        with(density) { 70.dp.toPx() },
+                        (containerSize.height - barHeightPx - with(density) { 90.dp.toPx() }).coerceAtLeast(0f)
+                    )
+                } else {
+                    pos.y - barHeightPx / 2f
+                }
+
                 Box(
                     modifier = Modifier
                         .offset {
                             IntOffset(
                                 (pos.x + sliderOffsetXPx).roundToInt(),
-                                (pos.y - sliderOffsetYPx).roundToInt(),
+                                clampedOffsetY.roundToInt()
                             )
                         }
-                        .width(36.dp)
-                        .height(110.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color.Black.copy(alpha = 0.65f))
-                        .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(18.dp))
-                        .pointerInput(Unit) {
-                            detectVerticalDragGestures(
-                                onDragStart = { dragAccumulator = 0f },
-                                onVerticalDrag = { change, dragAmount ->
-                                    change.consume()
-                                    // Dragging UP decreases Y, which should INCREASE exposure bias
-                                    dragAccumulator -= dragAmount
-                                    val newEv = (focusEvSlider + dragAccumulator / 60f).coerceIn(-4f, 4f)
-                                    val roundedEv = (Math.round(newEv * 3f) / 3f)
-                                    focusEvSlider = roundedEv
-                                    onEvent(GXVcamEvent.SetTapFocusEv(roundedEv))
-                                }
-                            )
+                        .width(animatedBarWidth)
+                        .height(animatedBarHeight)
+                        .clip(RoundedCornerShape(if (isEvExpanded) 24.dp else 19.dp))
+                        .background(if (isEvExpanded) Color(0xF0141414) else Color.Black.copy(alpha = 0.65f))
+                        .border(
+                            1.dp,
+                            if (isEvExpanded) activeFocusColor.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.20f),
+                            RoundedCornerShape(if (isEvExpanded) 24.dp else 19.dp)
+                        )
+                        .clickable(enabled = !isEvExpanded) {
+                            isEvExpanded = true
+                            lastInteractionTime = System.currentTimeMillis()
+                            // Set initial touch center at current EV
+                            val currentIdx = evSteps.indexOfFirst { abs(it - focusEvSlider) < 0.15f }.coerceAtLeast(0)
+                            currentScrubY = (currentIdx.toFloat() / (evSteps.size - 1)) * barHeightPx
+                            triggerNiagaraTick()
                         }
-                        .padding(vertical = 6.dp),
+                        .pointerInput(isEvExpanded) {
+                            if (isEvExpanded) {
+                                detectDragGestures(
+                                    onDragStart = { offset ->
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        currentScrubY = offset.y
+                                        val idx = ((offset.y / barHeightPx) * (evSteps.size - 1)).roundToInt().coerceIn(0, evSteps.size - 1)
+                                        if (idx != lastVibratedIndex) {
+                                            lastVibratedIndex = idx
+                                            triggerNiagaraTick()
+                                            val ev = evSteps[idx]
+                                            focusEvSlider = ev
+                                            onEvent(GXVcamEvent.SetTapFocusEv(ev))
+                                        }
+                                    },
+                                    onDrag = { change, _ ->
+                                        change.consume()
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        val y = change.position.y
+                                        currentScrubY = y
+                                        val idx = ((y / barHeightPx) * (evSteps.size - 1)).roundToInt().coerceIn(0, evSteps.size - 1)
+                                        if (idx != lastVibratedIndex) {
+                                            lastVibratedIndex = idx
+                                            triggerNiagaraTick()
+                                            val ev = evSteps[idx]
+                                            focusEvSlider = ev
+                                            onEvent(GXVcamEvent.SetTapFocusEv(ev))
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        lastInteractionTime = System.currentTimeMillis()
+                                    }
+                                )
+                            }
+                        }
+                        .padding(vertical = if (isEvExpanded) 8.dp else 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxHeight()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WbSunny,
-                            contentDescription = "EV Bias",
-                            tint = activeFocusColor,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            text = if (focusEvSlider >= 0) String.format("+%.1f", focusEvSlider) else String.format("%.1f", focusEvSlider),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (focusEvSlider != 0f) activeFocusColor else Color.White
-                        )
-                        Canvas(modifier = Modifier.width(14.dp).height(28.dp)) {
-                            val strokeW = 1.dp.toPx()
-                            drawLine(Color.White.copy(alpha = 0.3f), Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), strokeWidth = strokeW * 1.5f)
-                            drawLine(Color.White.copy(alpha = 0.2f), Offset(3.dp.toPx(), size.height * 0.2f), Offset(size.width - 3.dp.toPx(), size.height * 0.2f), strokeWidth = strokeW)
-                            drawLine(Color.White.copy(alpha = 0.2f), Offset(3.dp.toPx(), size.height * 0.8f), Offset(size.width - 3.dp.toPx(), size.height * 0.8f), strokeWidth = strokeW)
+                    if (!isEvExpanded) {
+                        // Compact Mode: Sun Icon + Live EV Readout + Expansion cue
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxHeight()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.WbSunny,
+                                contentDescription = "EV Compensation",
+                                tint = if (focusEvSlider != 0f) activeFocusColor else Color.White,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = if (focusEvSlider >= 0) String.format(Locale.US, "+%.1f", focusEvSlider) else String.format(Locale.US, "%.1f", focusEvSlider),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (focusEvSlider != 0f) activeFocusColor else Color.White
+                            )
+                            Canvas(modifier = Modifier.width(12.dp).height(12.dp)) {
+                                drawCircle(Color.White.copy(alpha = 0.5f), radius = 1.5.dp.toPx(), center = Offset(size.width / 2f, size.height * 0.2f))
+                                drawCircle(Color.White.copy(alpha = 0.5f), radius = 1.5.dp.toPx(), center = Offset(size.width / 2f, size.height * 0.5f))
+                                drawCircle(Color.White.copy(alpha = 0.5f), radius = 1.5.dp.toPx(), center = Offset(size.width / 2f, size.height * 0.8f))
+                            }
+                        }
+                    } else {
+                        // Expanded Mode: Niagara Launcher Style Fluid Alphabet/Step Wave Bar
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Step indicators with Niagara Wave displacement
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 4.dp),
+                                verticalArrangement = Arrangement.SpaceBetween,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                val waveRadiusPx = with(density) { 55.dp.toPx() }
+
+                                evSteps.forEachIndexed { i, step ->
+                                    val stepY = (i.toFloat() / (evSteps.size - 1)) * barHeightPx
+                                    val dist = abs(stepY - currentScrubY)
+                                    val isInWave = dist < waveRadiusPx
+                                    val waveFactor = if (isInWave) {
+                                        ((1f + cos(Math.PI * (dist / waveRadiusPx))) / 2f).toFloat()
+                                    } else {
+                                        0f
+                                    }
+
+                                    val isMajor = (step == 3.0f || step == 2.0f || step == 1.0f || step == 0.0f || step == -1.0f || step == -2.0f || step == -3.0f)
+                                    val isSelected = (i == lastVibratedIndex)
+
+                                    val waveShift = waveFactor * with(density) { 14.dp.toPx() }
+                                    val textScale = 1f + waveFactor * 0.40f
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Start,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .graphicsLayer {
+                                                translationX = waveShift
+                                                scaleX = textScale
+                                                scaleY = textScale
+                                            }
+                                    ) {
+                                        // Left tick line
+                                        Box(
+                                            modifier = Modifier
+                                                .width(if (isMajor || isSelected) 12.dp else 6.dp)
+                                                .height(if (isSelected) 2.5.dp else 1.5.dp)
+                                                .background(
+                                                    if (isSelected) activeFocusColor
+                                                    else if (isMajor) Color.White.copy(alpha = 0.85f)
+                                                    else Color.White.copy(alpha = 0.35f),
+                                                    RoundedCornerShape(1.dp)
+                                                )
+                                        )
+
+                                        Spacer(modifier = Modifier.width(4.dp))
+
+                                        // Value Label (Always show for major stops or when magnified by Niagara wave)
+                                        if (isMajor || waveFactor > 0.45f) {
+                                            Text(
+                                                text = if (step == 0f) "0" else if (isMajor) String.format(Locale.US, "%+.0f", step) else String.format(Locale.US, "%+.1f", step),
+                                                fontSize = if (isSelected) 11.sp else 9.sp,
+                                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
+                                                color = if (isSelected) activeFocusColor else Color.White.copy(alpha = 0.75f + waveFactor * 0.25f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Niagara Floating Magnifier Bubble following finger
+                            val bubbleOffsetXPx = with(density) {
+                                if (isNearRightEdge) -62.dp.toPx() else 54.dp.toPx()
+                            }
+                            val clampedBubbleY = currentScrubY.coerceIn(
+                                with(density) { 12.dp.toPx() },
+                                (barHeightPx - with(density) { 12.dp.toPx() })
+                            )
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = activeFocusColor,
+                                shadowElevation = 6.dp,
+                                modifier = Modifier
+                                    .offset {
+                                        IntOffset(
+                                            bubbleOffsetXPx.roundToInt(),
+                                            (clampedBubbleY - with(density) { 15.dp.toPx() }).roundToInt()
+                                        )
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.WbSunny,
+                                        contentDescription = null,
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Text(
+                                        text = if (focusEvSlider >= 0) String.format(Locale.US, "+%.1f", focusEvSlider) else String.format(Locale.US, "%.1f", focusEvSlider),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.Black
+                                    )
+                                }
+                            }
                         }
                     }
                 }

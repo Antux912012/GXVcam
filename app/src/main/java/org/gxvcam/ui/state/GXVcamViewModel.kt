@@ -333,7 +333,10 @@ class GXVcamViewModel : ViewModel() {
     private fun handleCycleAspectRatio() {
         val next = when (_uiState.value.aspectRatio) {
             AspectRatio.RATIO_4_3 -> AspectRatio.RATIO_16_9
-            AspectRatio.RATIO_16_9 -> AspectRatio.RATIO_FULL
+            AspectRatio.RATIO_16_9 -> AspectRatio.RATIO_1_1
+            AspectRatio.RATIO_1_1 -> AspectRatio.RATIO_3_2
+            AspectRatio.RATIO_3_2 -> AspectRatio.RATIO_21_9
+            AspectRatio.RATIO_21_9 -> AspectRatio.RATIO_FULL
             AspectRatio.RATIO_FULL -> AspectRatio.RATIO_4_3
         }
         _uiState.update { it.copy(aspectRatio = next) }

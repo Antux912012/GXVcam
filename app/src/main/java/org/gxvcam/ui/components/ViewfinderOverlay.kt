@@ -90,10 +90,12 @@ fun GXVViewfinderContainer(
         label = "viewfinderCorners"
     )
 
+    val isFull = aspectRatio == AspectRatio.RATIO_FULL
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(OledBlack)
+            .background(if (isFull) Color.Transparent else OledBlack)
             .onSizeChanged { containerSize = it }
             .pointerInput(Unit) {
                 detectTransformGestures { _, _, zoom, _ ->
@@ -125,6 +127,9 @@ fun GXVViewfinderContainer(
         val targetRatio = when (aspectRatio) {
             AspectRatio.RATIO_4_3 -> 3f / 4f // Portrait 4:3
             AspectRatio.RATIO_16_9 -> 9f / 16f // Portrait 16:9
+            AspectRatio.RATIO_1_1 -> 1.0f // Square 1:1
+            AspectRatio.RATIO_3_2 -> 2f / 3f // 3:2
+            AspectRatio.RATIO_21_9 -> 9f / 21f // 21:9
             AspectRatio.RATIO_FULL -> if (containerSize.height > 0) {
                 containerSize.width.toFloat() / containerSize.height.toFloat()
             } else 9f / 16f

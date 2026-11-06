@@ -28,6 +28,7 @@ import org.gxvcam.ui.theme.GXVMotion
 fun AgcLutCarousel(
     selectedProfile: AgcColorProfile,
     onSelectProfile: (AgcColorProfile) -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -41,12 +42,12 @@ fun AgcLutCarousel(
         AgcColorProfile.entries.forEach { profile ->
             val isSelected = profile == selectedProfile
             val borderColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else if (isFull) Color.White.copy(alpha = 0.20f) else Color.Transparent,
                 animationSpec = GXVMotion.fastEffects(),
                 label = "lutBorder"
             )
             val borderWidth by animateDpAsState(
-                targetValue = if (isSelected) 2.dp else 0.dp,
+                targetValue = if (isSelected) 2.dp else if (isFull) 1.dp else 0.dp,
                 animationSpec = GXVMotion.spatialBouncyDp,
                 label = "lutBorderWidth"
             )
@@ -55,7 +56,8 @@ fun AgcLutCarousel(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(
-                        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
+                        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isFull) 0.85f else 0.9f)
+                        else if (isFull) Color(0x55000000)
                         else DarkSurfaceContainerHigh
                     )
                     .border(borderWidth, borderColor, CircleShape)

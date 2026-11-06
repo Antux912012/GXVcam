@@ -1,19 +1,26 @@
 package org.gxvcam.ui
 
+import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.gxvcam.ui.components.*
+import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.CameraMode
 import org.gxvcam.ui.state.GXVcamEvent
 import org.gxvcam.ui.state.GXVcamUiState
@@ -48,13 +55,37 @@ fun GXVcamScreenContent(
     onOpenGallery: () -> Unit = {},
     viewfinderContent: @Composable () -> Unit
 ) {
+    val isFull = uiState.aspectRatio == AspectRatio.RATIO_FULL
+    val view = LocalView.current
+
+    // Immersive Mode: When FULL aspect ratio is selected, hide notification & time status bar
+    DisposableEffect(isFull) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (isFull) {
+                insetsController.hide(WindowInsetsCompat.Type.statusBars())
+            } else {
+                insetsController.show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+        onDispose {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                insetsController.show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(OledBlack)
-            .windowInsetsPadding(WindowInsets.systemBars)
     ) {
-        // Center: Adaptive Viewfinder Container
+        // Center: Adaptive Viewfinder Container (spans 100% of the screen in FULL mode)
         GXVViewfinderContainer(
             aspectRatio = uiState.aspectRatio,
             gridEnabled = uiState.gridEnabled,
@@ -74,9 +105,12 @@ fun GXVcamScreenContent(
             exit = fadeOut(GXVMotion.fastEffects()),
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 72.dp, end = 16.dp)
+                .padding(top = if (isFull) 60.dp else 72.dp, end = 16.dp)
         ) {
-            LiveRgbHistogram(histogram = uiState.histogram)
+            LiveRgbHistogram(
+                histogram = uiState.histogram,
+                isFull = isFull,
+            )
         }
 
         // Top Column: Quick Settings Bar and Moto Video Bar
@@ -99,7 +133,8 @@ fun GXVcamScreenContent(
                 isRawSupported = uiState.hardwareCapabilities.isRawSupported,
                 isRawAndJpegEnabled = uiState.proSettings.isRawAndJpegEnabled,
                 onToggleRaw = { onEvent(GXVcamEvent.ToggleRawCapture) },
-                onToggleAgc = { onEvent(GXVcamEvent.ToggleAgcSheet) }
+                onToggleAgc = { onEvent(GXVcamEvent.ToggleAgcSheet) },
+                isFull = isFull
             )
 
             // Moto Cam 5 Video Quick Bar (shown when in Video mode)
@@ -124,6 +159,7 @@ fun GXVcamScreenContent(
                     onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                     onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                     layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.TOP_BAR,
+                    isFull = isFull,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp),
@@ -141,6 +177,7 @@ fun GXVcamScreenContent(
                 onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                 onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                 layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_RIGHT,
+                isFull = isFull,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 10.dp),
@@ -157,6 +194,7 @@ fun GXVcamScreenContent(
                 onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                 onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                 layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_LEFT,
+                isFull = isFull,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 10.dp),
@@ -168,6 +206,7 @@ fun GXVcamScreenContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -182,6 +221,7 @@ fun GXVcamScreenContent(
                     onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                     onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                     layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.BOTTOM_DOCK,
+                    isFull = isFull,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -194,7 +234,8 @@ fun GXVcamScreenContent(
             ) {
                 AgcLutCarousel(
                     selectedProfile = uiState.agcSettings.activeProfile,
-                    onSelectProfile = { onEvent(GXVcamEvent.SelectAgcProfile(it)) }
+                    onSelectProfile = { onEvent(GXVcamEvent.SelectAgcProfile(it)) },
+                    isFull = isFull
                 )
             }
 
@@ -203,7 +244,8 @@ fun GXVcamScreenContent(
                 activeLens = uiState.activeLens,
                 currentZoomRatio = uiState.currentZoomRatio,
                 onLensSelected = { onEvent(GXVcamEvent.OnLensSelected(it)) },
-                onZoomChanged = { onEvent(GXVcamEvent.OnZoomChanged(it)) }
+                onZoomChanged = { onEvent(GXVcamEvent.OnZoomChanged(it)) },
+                isFull = isFull
             )
 
             // Primary Morphing Shutter & Mode Deck
@@ -224,7 +266,8 @@ fun GXVcamScreenContent(
                     }
                 },
                 onFlipCamera = { onEvent(GXVcamEvent.OnFlipCamera) },
-                onOpenGallery = onOpenGallery
+                onOpenGallery = onOpenGallery,
+                isFull = isFull
             )
         }
 

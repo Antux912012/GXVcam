@@ -59,6 +59,9 @@ enum class FlashMode {
 enum class AspectRatio(val ratioValue: Float, val label: String) {
     RATIO_4_3(0.75f, "4:3"),
     RATIO_16_9(0.5625f, "16:9"),
+    RATIO_1_1(1.0f, "1:1"),
+    RATIO_3_2(2f / 3f, "3:2"),
+    RATIO_21_9(9f / 21f, "21:9"),
     RATIO_FULL(0.45f, "FULL");
 
     val ratio: Float get() = ratioValue

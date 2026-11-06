@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.FlashMode
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
 
 @Composable
@@ -35,12 +37,19 @@ fun TopQuickSettingsBar(
     isRawAndJpegEnabled: Boolean = false,
     onToggleRaw: () -> Unit = {},
     onToggleAgc: () -> Unit = {},
+    isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val buttonContainerColor = if (isFull) Color(0x55000000) else DarkSurfaceContainerHigh
+    val borderStroke = if (isFull) BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)) else null
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
+            .then(
+                if (isFull) Modifier.statusBarsPadding().padding(top = 10.dp)
+                else Modifier.statusBarsPadding()
+            )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -49,10 +58,12 @@ fun TopQuickSettingsBar(
         FilledTonalIconButton(
             onClick = onCycleFlash,
             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = DarkSurfaceContainerHigh,
+                containerColor = buttonContainerColor,
                 contentColor = if (flashMode != FlashMode.OFF) MaterialTheme.colorScheme.primary else Color.White
             ),
-            modifier = Modifier.size(42.dp)
+            modifier = Modifier
+                .size(42.dp)
+                .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier)
         ) {
             Icon(
                 imageVector = when (flashMode) {
@@ -105,9 +116,10 @@ fun TopQuickSettingsBar(
                     FilledTonalButton(
                         onClick = onToggleRaw,
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = if (isRawAndJpegEnabled) MaterialTheme.colorScheme.tertiaryContainer else DarkSurfaceContainerHigh,
+                            containerColor = if (isRawAndJpegEnabled) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = if (isFull) 0.85f else 1f) else buttonContainerColor,
                             contentColor = if (isRawAndJpegEnabled) MaterialTheme.colorScheme.onTertiaryContainer else Color.White
                         ),
+                        border = if (!isRawAndJpegEnabled) borderStroke else null,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.height(36.dp)
                     ) {
@@ -123,9 +135,10 @@ fun TopQuickSettingsBar(
                 FilledTonalButton(
                     onClick = onCycleAspectRatio,
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = DarkSurfaceContainerHigh,
+                        containerColor = buttonContainerColor,
                         contentColor = Color.White
                     ),
+                    border = borderStroke,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(36.dp)
                 ) {
@@ -146,10 +159,12 @@ fun TopQuickSettingsBar(
             FilledTonalIconButton(
                 onClick = onToggleAgc,
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = DarkSurfaceContainerHigh,
+                    containerColor = buttonContainerColor,
                     contentColor = MaterialTheme.colorScheme.primary,
                 ),
-                modifier = Modifier.size(42.dp),
+                modifier = Modifier
+                    .size(42.dp)
+                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
             ) {
                 Text(
                     text = "AGC",
@@ -162,10 +177,12 @@ fun TopQuickSettingsBar(
             FilledTonalIconButton(
                 onClick = onToggleGrid,
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = DarkSurfaceContainerHigh,
+                    containerColor = buttonContainerColor,
                     contentColor = if (gridEnabled) MaterialTheme.colorScheme.primary else Color.White,
                 ),
-                modifier = Modifier.size(42.dp),
+                modifier = Modifier
+                    .size(42.dp)
+                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
             ) {
                 Icon(
                     imageVector = Icons.Default.GridOn,
@@ -178,10 +195,12 @@ fun TopQuickSettingsBar(
             FilledTonalIconButton(
                 onClick = onOpenSettings,
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = DarkSurfaceContainerHigh,
+                    containerColor = buttonContainerColor,
                     contentColor = Color.White,
                 ),
-                modifier = Modifier.size(42.dp),
+                modifier = Modifier
+                    .size(42.dp)
+                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,

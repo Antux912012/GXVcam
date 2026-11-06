@@ -45,6 +45,7 @@ fun ProManualDeck(
     onProSettingChanged: ((ProSettings) -> ProSettings) -> Unit,
     modifier: Modifier = Modifier,
     layoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
+    isFull: Boolean = false,
 ) {
     val chips = listOf(
         ProChipData(
@@ -128,6 +129,7 @@ fun ProManualDeck(
                                 hardwareCapabilities = hardwareCapabilities,
                                 onProSettingChanged = onProSettingChanged,
                                 onClose = { onControlSelected(null) },
+                                isFull = isFull,
                                 modifier = Modifier.width(260.dp),
                             )
                         }
@@ -140,6 +142,7 @@ fun ProManualDeck(
                         isAnyManual = proSettings.isAnyManual,
                         onControlSelected = onControlSelected,
                         onResetAll = onResetAll,
+                        isFull = isFull,
                     )
                 }
             }
@@ -169,6 +172,7 @@ fun ProManualDeck(
                         isAnyManual = proSettings.isAnyManual,
                         onControlSelected = onControlSelected,
                         onResetAll = onResetAll,
+                        isFull = isFull,
                     )
 
                     // Floating Flyout Card on Right of Rail
@@ -190,6 +194,7 @@ fun ProManualDeck(
                                 hardwareCapabilities = hardwareCapabilities,
                                 onProSettingChanged = onProSettingChanged,
                                 onClose = { onControlSelected(null) },
+                                isFull = isFull,
                                 modifier = Modifier.width(260.dp),
                             )
                         }
@@ -224,6 +229,7 @@ fun ProManualDeck(
                         isAnyManual = proSettings.isAnyManual,
                         onControlSelected = onControlSelected,
                         onResetAll = onResetAll,
+                        isFull = isFull,
                     )
 
                     AnimatedVisibility(
@@ -244,6 +250,7 @@ fun ProManualDeck(
                                 hardwareCapabilities = hardwareCapabilities,
                                 onProSettingChanged = onProSettingChanged,
                                 onClose = { onControlSelected(null) },
+                                isFull = isFull,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -290,6 +297,7 @@ fun ProManualDeck(
                                 hardwareCapabilities = hardwareCapabilities,
                                 onProSettingChanged = onProSettingChanged,
                                 onClose = { onControlSelected(null) },
+                                isFull = isFull,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -301,6 +309,7 @@ fun ProManualDeck(
                         isAnyManual = proSettings.isAnyManual,
                         onControlSelected = onControlSelected,
                         onResetAll = onResetAll,
+                        isFull = isFull,
                     )
                 }
             }
@@ -315,13 +324,14 @@ private fun VerticalChipsRail(
     isAnyManual: Boolean,
     onControlSelected: (String?) -> Unit,
     onResetAll: () -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = DarkSurfaceContainerHigh.copy(alpha = 0.90f),
-        tonalElevation = 6.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)),
+        color = if (isFull) Color(0x55000000) else DarkSurfaceContainerHigh.copy(alpha = 0.90f),
+        tonalElevation = if (isFull) 0.dp else 6.dp,
+        border = BorderStroke(1.dp, if (isFull) Color.White.copy(alpha = 0.20f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)),
         modifier = modifier.width(62.dp),
     ) {
         Column(
@@ -335,6 +345,7 @@ private fun VerticalChipsRail(
                     chip = chip,
                     isSelected = isSelected,
                     onClick = { onControlSelected(if (isSelected) null else chip.id) },
+                    isFull = isFull,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(54.dp),
@@ -368,6 +379,7 @@ private fun HorizontalChipsRail(
     isAnyManual: Boolean,
     onControlSelected: (String?) -> Unit,
     onResetAll: () -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -381,6 +393,7 @@ private fun HorizontalChipsRail(
                 chip = chip,
                 isSelected = isSelected,
                 onClick = { onControlSelected(if (isSelected) null else chip.id) },
+                isFull = isFull,
                 modifier = Modifier
                     .weight(1f)
                     .height(50.dp),
@@ -411,16 +424,18 @@ private fun ProChipItem(
     chip: ProChipData,
     isSelected: Boolean,
     onClick: () -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = when {
-            isSelected -> MaterialTheme.colorScheme.primaryContainer
-            chip.isManual -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
-            else -> DarkSurfaceContainerHigh
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isFull) 0.88f else 1.0f)
+            chip.isManual -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = if (isFull) 0.85f else 0.85f)
+            else -> if (isFull) Color(0x33000000) else DarkSurfaceContainerHigh
         },
-        tonalElevation = if (isSelected || chip.isManual) 4.dp else 2.dp,
+        border = if (isFull && !isSelected && !chip.isManual) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else null,
+        tonalElevation = if (isFull) 0.dp else if (isSelected || chip.isManual) 4.dp else 2.dp,
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .then(
@@ -471,13 +486,14 @@ private fun ExpandedControlCard(
     hardwareCapabilities: ProHardwareCapabilities,
     onProSettingChanged: ((ProSettings) -> ProSettings) -> Unit,
     onClose: () -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         shape = RoundedCornerShape(22.dp),
-        color = DarkSurfaceContainerHigh.copy(alpha = 0.95f),
-        tonalElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        color = if (isFull) Color(0x66000000) else DarkSurfaceContainerHigh.copy(alpha = 0.95f),
+        tonalElevation = if (isFull) 0.dp else 8.dp,
+        border = BorderStroke(1.dp, if (isFull) Color.White.copy(alpha = 0.22f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         modifier = modifier,
     ) {
         Column(
@@ -926,11 +942,13 @@ private fun formatShutterSpeed(ns: Long, isManual: Boolean): String {
 @Composable
 fun LiveRgbHistogram(
     histogram: HistogramData,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Color.Black.copy(alpha = 0.70f),
+        color = if (isFull) Color(0x40000000) else Color.Black.copy(alpha = 0.70f),
+        border = if (isFull) BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)) else null,
         modifier = modifier
             .width(110.dp)
             .height(54.dp)

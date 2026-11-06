@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,11 +37,15 @@ fun ExpressiveLensSelector(
     currentZoomRatio: Float,
     onLensSelected: (OpticalLens) -> Unit,
     onZoomChanged: (Float) -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     var isDraggingSlider by remember { mutableStateOf(false) }
     var lastHapticStep by remember { mutableIntStateOf((currentZoomRatio * 10f).roundToInt()) }
+
+    val pillContainerColor = if (isFull) Color(0x55000000) else DarkSurfaceContainerHigh
+    val pillBorder = if (isFull) BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)) else null
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -54,8 +59,9 @@ fun ExpressiveLensSelector(
         ) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = DarkSurfaceContainerHigh,
-                tonalElevation = 6.dp,
+                color = pillContainerColor,
+                border = pillBorder,
+                tonalElevation = if (isFull) 0.dp else 6.dp,
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
                 Text(
@@ -71,8 +77,9 @@ fun ExpressiveLensSelector(
         // Floating M3 Pill Deck
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = DarkSurfaceContainerHigh,
-            tonalElevation = 4.dp,
+            color = pillContainerColor,
+            border = pillBorder,
+            tonalElevation = if (isFull) 0.dp else 4.dp,
             modifier = Modifier
                 .height(48.dp)
                 .draggable(

@@ -42,6 +42,7 @@ import kotlinx.coroutines.withContext
 import org.gxvcam.ui.state.CameraMode
 import org.gxvcam.ui.state.GXVcamUiState
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
+import androidx.compose.foundation.BorderStroke
 import org.gxvcam.ui.theme.GXVMotion
 
 @Composable
@@ -51,6 +52,7 @@ fun BottomControlDeck(
     onFlipCamera: () -> Unit,
     onSelectMode: (CameraMode) -> Unit,
     onOpenGallery: () -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     BottomControlDeck(
@@ -61,6 +63,7 @@ fun BottomControlDeck(
         onShutterClick = onShutterClick,
         onFlipCamera = onFlipCamera,
         onOpenGallery = onOpenGallery,
+        isFull = isFull,
         modifier = modifier
     )
 }
@@ -74,6 +77,7 @@ fun BottomControlDeck(
     onShutterClick: () -> Unit,
     onFlipCamera: () -> Unit,
     onOpenGallery: () -> Unit,
+    isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -105,8 +109,9 @@ fun BottomControlDeck(
             // Left Column: Gallery Thumbnail Button
             Surface(
                 shape = RoundedCornerShape(18.dp),
-                color = DarkSurfaceContainerHigh,
-                tonalElevation = 4.dp,
+                color = if (isFull) Color(0x55000000) else DarkSurfaceContainerHigh,
+                border = if (isFull) BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)) else null,
+                tonalElevation = if (isFull) 0.dp else 4.dp,
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(18.dp))
@@ -187,12 +192,13 @@ fun BottomControlDeck(
                     onFlipCamera()
                 },
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = DarkSurfaceContainerHigh,
+                    containerColor = if (isFull) Color(0x55000000) else DarkSurfaceContainerHigh,
                     contentColor = Color.White
                 ),
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
+                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier)
             ) {
                 Icon(
                     imageVector = Icons.Default.Cameraswitch,

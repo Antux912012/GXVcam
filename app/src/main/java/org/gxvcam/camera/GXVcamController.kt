@@ -112,7 +112,7 @@ class GXVcamController(
 
     val previewView: PreviewView = PreviewView(context).apply {
         implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-        scaleType = PreviewView.ScaleType.FIT_CENTER
+        scaleType = PreviewView.ScaleType.FILL_CENTER
     }
 
     private var cameraProvider: ProcessCameraProvider? = null
@@ -206,8 +206,11 @@ class GXVcamController(
 
                 val targetRatio = when (aspectRatio) {
                     AspectRatio.RATIO_16_9,
+                    AspectRatio.RATIO_21_9,
                     AspectRatio.RATIO_FULL -> androidx.camera.core.AspectRatio.RATIO_16_9
-                    else -> androidx.camera.core.AspectRatio.RATIO_4_3
+                    AspectRatio.RATIO_4_3,
+                    AspectRatio.RATIO_1_1,
+                    AspectRatio.RATIO_3_2 -> androidx.camera.core.AspectRatio.RATIO_4_3
                 }
 
                 preview = Preview.Builder()
@@ -712,12 +715,13 @@ class GXVcamController(
                         buffer.get(bytes)
                         image.close()
 
-                        // Process through Vivo/Zeiss & GCam HDR+ ISP pipeline with manual overrides
+                        // Process through Vivo/Zeiss & GCam HDR+ ISP pipeline with manual overrides & aspect ratio crop
                         val processed = GXVImageProcessor.processJpeg(
                             inputJpeg = bytes,
                             profile = profile,
                             activeLens = lens,
-                            customSettings = agc
+                            customSettings = agc,
+                            aspectRatio = lastBindConfig?.aspectRatio ?: AspectRatio.RATIO_4_3
                         )
 
                         val timestamp = System.currentTimeMillis()

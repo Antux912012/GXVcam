@@ -11,6 +11,7 @@ import android.graphics.Shader
 import android.media.ExifInterface
 import android.util.Log
 import org.gxvcam.ui.state.AgcColorProfile
+import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.OpticalLens
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -33,7 +34,8 @@ object GXVImageProcessor {
         inputJpeg: ByteArray,
         profile: AgcColorProfile = AgcColorProfile.ZEISS_NATURAL,
         activeLens: OpticalLens = OpticalLens.MAIN_1X,
-        customSettings: org.gxvcam.ui.state.AgcLibPatcherSettings? = null
+        customSettings: org.gxvcam.ui.state.AgcLibPatcherSettings? = null,
+        aspectRatio: AspectRatio = AspectRatio.RATIO_4_3
     ): ByteArray {
         val startTime = System.currentTimeMillis()
         try {
@@ -41,8 +43,11 @@ object GXVImageProcessor {
             val exifTags = readExifAttributes(inputJpeg)
 
             // 2. Decode JPEG to Bitmap
-            val decodedBitmap = BitmapFactory.decodeByteArray(inputJpeg, 0, inputJpeg.size, null)
+            val rawBitmap = BitmapFactory.decodeByteArray(inputJpeg, 0, inputJpeg.size, null)
                 ?: return inputJpeg
+
+            // Crop to target aspect ratio (1:1, 3:2, 21:9, FULL, etc.)
+            val decodedBitmap = cropToAspectRatio(rawBitmap, aspectRatio)
 
             val width = decodedBitmap.width
             val height = decodedBitmap.height
@@ -82,6 +87,46 @@ object GXVImageProcessor {
         } catch (e: Exception) {
             Log.e(TAG, "Error processing JPEG: ${e.message}", e)
             return inputJpeg
+        }
+    }
+
+    private fun cropToAspectRatio(bitmap: Bitmap, aspectRatio: AspectRatio): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
+        val isLandscape = w > h
+        val targetRatio = when (aspectRatio) {
+            AspectRatio.RATIO_4_3 -> 4f / 3f
+            AspectRatio.RATIO_16_9 -> 16f / 9f
+            AspectRatio.RATIO_1_1 -> 1.0f
+            AspectRatio.RATIO_3_2 -> 3f / 2f
+            AspectRatio.RATIO_21_9 -> 21f / 9f
+            AspectRatio.RATIO_FULL -> 20f / 9f
+        }
+        val desiredRatio = if (isLandscape) targetRatio else (1f / targetRatio)
+        val currentRatio = w.toFloat() / h.toFloat()
+
+        val cropW: Int
+        val cropH: Int
+        if (currentRatio > desiredRatio + 0.015f) {
+            cropH = h
+            cropW = (h * desiredRatio).toInt().coerceAtMost(w)
+        } else if (currentRatio < desiredRatio - 0.015f) {
+            cropW = w
+            cropH = (w / desiredRatio).toInt().coerceAtMost(h)
+        } else {
+            return bitmap
+        }
+
+        val startX = ((w - cropW) / 2).coerceAtLeast(0)
+        val startY = ((h - cropH) / 2).coerceAtLeast(0)
+        return try {
+            val cropped = Bitmap.createBitmap(bitmap, startX, startY, cropW, cropH)
+            if (cropped != bitmap) {
+                bitmap.recycle()
+            }
+            cropped
+        } catch (_: Exception) {
+            bitmap
         }
     }
 

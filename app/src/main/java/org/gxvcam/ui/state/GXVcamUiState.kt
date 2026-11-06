@@ -275,11 +275,13 @@ data class ProSettings(
     val isAnyManual: Boolean get() = isManualIso || isManualShutter || isManualFocus || (whiteBalanceMode != WhiteBalanceMode.AUTO) || (evIndex != 0)
 }
 
-enum class GridType(val label: String) {
-    NONE("Off"),
-    RULE_OF_THIRDS("3x3"),
-    GOLDEN_RATIO("Phi"),
-    CROSSHAIR("Center"),
+enum class GridType(val label: String, val subtitle: String) {
+    NONE("Off", "No grid lines"),
+    RULE_OF_THIRDS("Rule of 3rds", "3x3 photography grid"),
+    SQUARE("Square Grid", "4x4 architectural & square framing"),
+    DIAG_SQUARE("Diag. + Square", "Sony Alpha signature grid with diagonal guides"),
+    GOLDEN_RATIO("Golden Ratio (Phi)", "0.618 divine proportion grid"),
+    CROSSHAIR("Center Crosshair", "Center spot & crosshairs"),
 }
 
 enum class ProLayoutPosition(val label: String, val description: String) {
@@ -374,7 +376,9 @@ data class GXVcamUiState(
     val motoVideoSettings: MotoVideoSettings = MotoVideoSettings(),
     val agcSettings: AgcLibPatcherSettings = AgcLibPatcherSettings(),
     val hardwareCapabilities: ProHardwareCapabilities = ProHardwareCapabilities(),
-    val histogram: HistogramData = HistogramData()
+    val histogram: HistogramData = HistogramData(),
+    val isAeAfLocked: Boolean = false,
+    val tapFocusEvOffset: Float = 0f
 )
 
 sealed interface GXVcamEvent {
@@ -386,6 +390,9 @@ sealed interface GXVcamEvent {
     data object CycleFlashMode : GXVcamEvent
     data object CycleAspectRatio : GXVcamEvent
     data object ToggleGrid : GXVcamEvent
+    data class SetGridType(val gridType: GridType) : GXVcamEvent
+    data class SetAeAfLock(val locked: Boolean, val x: Float = 0f, val y: Float = 0f) : GXVcamEvent
+    data class SetTapFocusEv(val ev: Float) : GXVcamEvent
     data class UpdateProSettings(val settings: ProSettings) : GXVcamEvent
     data class UpdateHardwareCapabilities(val capabilities: ProHardwareCapabilities) : GXVcamEvent
     data class UpdateHistogram(val data: HistogramData) : GXVcamEvent

@@ -64,6 +64,7 @@ fun GXVcamScreenContent(
             showHorizon = uiState.manualSettings.isHorizonLevelVisible,
             levelHorizonDegrees = uiState.levelHorizonDegrees,
             currentZoom = uiState.currentZoomRatio,
+            isAeAfLocked = uiState.isAeAfLocked,
             onEvent = onEvent,
             modifier = Modifier.fillMaxSize(),
             content = viewfinderContent
@@ -94,17 +95,21 @@ fun GXVcamScreenContent(
                 flashMode = uiState.flashMode,
                 aspectRatio = uiState.aspectRatio,
                 gridEnabled = uiState.gridEnabled,
+                gridType = uiState.manualSettings.gridType,
+                activeProfile = uiState.agcSettings.activeProfile,
                 isRecording = uiState.isRecording,
                 recordingDurationMs = uiState.recordingDurationMs,
                 onCycleFlash = { onEvent(GXVcamEvent.OnCycleFlash) },
                 onCycleAspectRatio = { onEvent(GXVcamEvent.OnCycleAspectRatio) },
                 onToggleGrid = { onEvent(GXVcamEvent.OnToggleGrid) },
+                onSelectGrid = { onEvent(GXVcamEvent.SetGridType(it)) },
+                onSelectProfile = { onEvent(GXVcamEvent.SelectAgcProfile(it)) },
                 onOpenSettings = { onEvent(GXVcamEvent.ToggleSettingsSheet) },
+                onOpenLibPatcher = { onEvent(GXVcamEvent.ToggleAgcSheet) },
                 isProMode = uiState.currentMode == CameraMode.PRO,
                 isRawSupported = uiState.hardwareCapabilities.isRawSupported,
                 captureFormat = uiState.manualSettings.captureFormat,
                 onCycleCaptureFormat = { onEvent(GXVcamEvent.CycleCaptureFormat) },
-                onToggleAgc = { onEvent(GXVcamEvent.ToggleAgcSheet) },
                 isFull = isFull
             )
 
@@ -197,18 +202,7 @@ fun GXVcamScreenContent(
                 )
             }
 
-            // AGC LUT Color Profile Carousel (hidden in PRO mode to prevent visual clutter)
-            AnimatedVisibility(
-                visible = uiState.currentMode != CameraMode.PRO,
-                enter = fadeIn(GXVMotion.fastEffects()),
-                exit = fadeOut(GXVMotion.fastEffects())
-            ) {
-                AgcLutCarousel(
-                    selectedProfile = uiState.agcSettings.activeProfile,
-                    onSelectProfile = { onEvent(GXVcamEvent.SelectAgcProfile(it)) },
-                    isFull = isFull
-                )
-            }
+
 
             // M3 Expressive Lens Pill Selector
             ExpressiveLensSelector(

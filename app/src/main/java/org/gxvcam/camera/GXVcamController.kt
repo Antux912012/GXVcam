@@ -667,16 +667,37 @@ class GXVcamController(
         }
     }
 
-    fun triggerTapToFocus(x: Float, y: Float) {
+    fun triggerTapToFocus(x: Float, y: Float, isLocked: Boolean = false) {
         val cam = camera ?: return
         try {
             val point = previewView.meteringPointFactory.createPoint(x, y)
-            val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
-                .setAutoCancelDuration(3, TimeUnit.SECONDS)
-                .build()
-            cam.cameraControl.startFocusAndMetering(action)
+            val builder = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+            if (isLocked) {
+                builder.disableAutoCancel()
+            } else {
+                builder.setAutoCancelDuration(4, TimeUnit.SECONDS)
+            }
+            cam.cameraControl.startFocusAndMetering(builder.build())
         } catch (e: Exception) {
             Log.w(TAG, "Trigger tap to focus failed: ${e.message}")
+        }
+    }
+
+    fun unlockAeAf() {
+        val cam = camera ?: return
+        try {
+            cam.cameraControl.cancelFocusAndMetering()
+        } catch (e: Exception) {
+            Log.w(TAG, "Unlock AE/AF failed: ${e.message}")
+        }
+    }
+
+    fun setExposureCompensation(evIndex: Int) {
+        val cam = camera ?: return
+        try {
+            cam.cameraControl.setExposureCompensationIndex(evIndex)
+        } catch (e: Exception) {
+            Log.w(TAG, "Set exposure compensation failed: ${e.message}")
         }
     }
 

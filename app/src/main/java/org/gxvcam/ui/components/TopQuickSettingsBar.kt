@@ -1,13 +1,15 @@
 package org.gxvcam.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,11 +17,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.gxvcam.ui.state.AgcColorProfile
 import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.CaptureFormat
 import org.gxvcam.ui.state.FlashMode
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
+import org.gxvcam.ui.state.GridType
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
 
 @Composable
@@ -27,22 +29,29 @@ fun TopQuickSettingsBar(
     flashMode: FlashMode,
     aspectRatio: AspectRatio,
     gridEnabled: Boolean,
+    gridType: GridType = GridType.RULE_OF_THIRDS,
+    activeProfile: AgcColorProfile = AgcColorProfile.ZEISS_NATURAL,
     isRecording: Boolean,
     recordingDurationMs: Long,
     onCycleFlash: () -> Unit,
     onCycleAspectRatio: () -> Unit,
     onToggleGrid: () -> Unit,
+    onSelectGrid: (GridType) -> Unit = {},
+    onSelectProfile: (AgcColorProfile) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenLibPatcher: () -> Unit = {},
     isProMode: Boolean = false,
     isRawSupported: Boolean = false,
     captureFormat: CaptureFormat = CaptureFormat.JPEG,
     onCycleCaptureFormat: () -> Unit = {},
-    onToggleAgc: () -> Unit = {},
     isFull: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val buttonContainerColor = if (isFull) Color(0x55000000) else DarkSurfaceContainerHigh
     val borderStroke = if (isFull) BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)) else null
+
+    var showProfileMenu by remember { mutableStateOf(false) }
+    var showGridMenu by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -51,34 +60,145 @@ fun TopQuickSettingsBar(
                 if (isFull) Modifier.statusBarsPadding().padding(top = 10.dp)
                 else Modifier.statusBarsPadding()
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Flash Mode Button
-        FilledTonalIconButton(
-            onClick = onCycleFlash,
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = buttonContainerColor,
-                contentColor = if (flashMode != FlashMode.OFF) MaterialTheme.colorScheme.primary else Color.White
-            ),
-            modifier = Modifier
-                .size(42.dp)
-                .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier)
+        // Left Group: Flash Mode & Color Profile Button (LUT Engine)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = when (flashMode) {
-                    FlashMode.ON -> Icons.Default.FlashOn
-                    FlashMode.AUTO -> Icons.Default.FlashAuto
-                    FlashMode.TORCH -> Icons.Default.Highlight
-                    FlashMode.OFF -> Icons.Default.FlashOff
-                },
-                contentDescription = "Flash Mode",
-                modifier = Modifier.size(20.dp)
-            )
+            // Flash Mode Button
+            FilledTonalIconButton(
+                onClick = onCycleFlash,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = buttonContainerColor,
+                    contentColor = if (flashMode != FlashMode.OFF) MaterialTheme.colorScheme.primary else Color.White
+                ),
+                modifier = Modifier
+                    .size(40.dp)
+                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier)
+            ) {
+                Icon(
+                    imageVector = when (flashMode) {
+                        FlashMode.ON -> Icons.Default.FlashOn
+                        FlashMode.AUTO -> Icons.Default.FlashAuto
+                        FlashMode.TORCH -> Icons.Default.Highlight
+                        FlashMode.OFF -> Icons.Default.FlashOff
+                    },
+                    contentDescription = "Flash Mode",
+                    modifier = Modifier.size(19.dp)
+                )
+            }
+
+            // Color Profile Dropdown Button (Near Flash on Top Left)
+            Box {
+                FilledTonalButton(
+                    onClick = { showProfileMenu = true },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = buttonContainerColor,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = borderStroke,
+                    contentPadding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Palette,
+                        contentDescription = "Color Profile",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = activeProfile.label.split(" ").first(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showProfileMenu,
+                    onDismissRequest = { showProfileMenu = false },
+                    modifier = Modifier
+                        .background(Color(0xFF1E1E1E))
+                        .widthIn(min = 220.dp)
+                ) {
+                    Text(
+                        text = "COLOR PROFILES (LUT)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+
+                    AgcColorProfile.entries.forEach { profile ->
+                        val isSelected = profile == activeProfile
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = profile.label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                    )
+                                    Text(
+                                        text = profile.description,
+                                        fontSize = 10.sp,
+                                        color = Color.White.copy(alpha = 0.6f)
+                                    )
+                                }
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            },
+                            onClick = {
+                                onSelectProfile(profile)
+                                showProfileMenu = false
+                            }
+                        )
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "LibPatcher",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Open LibPatcher...",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        onClick = {
+                            showProfileMenu = false
+                            onOpenLibPatcher()
+                        }
+                    )
+                }
+            }
         }
 
-        // Recording Duration Badge or Center Toggles
+        // Center Group: Recording Duration or Format & Aspect Ratio
         if (isRecording) {
             val totalSeconds = recordingDurationMs / 1000
             val minutes = totalSeconds / 60
@@ -109,7 +229,7 @@ fun TopQuickSettingsBar(
             }
         } else {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Capture Format Toggle (JPEG / RAW / RAW+JPEG) in Pro Mode
@@ -121,7 +241,7 @@ fun TopQuickSettingsBar(
                             contentColor = if (captureFormat != CaptureFormat.JPEG) MaterialTheme.colorScheme.onTertiaryContainer else Color.White
                         ),
                         border = if (captureFormat == CaptureFormat.JPEG) borderStroke else null,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
                         modifier = Modifier.height(36.dp)
                     ) {
                         Text(
@@ -140,56 +260,92 @@ fun TopQuickSettingsBar(
                         contentColor = Color.White
                     ),
                     border = borderStroke,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier.height(36.dp)
                 ) {
                     Text(
                         text = aspectRatio.label,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
             }
         }
 
+        // Right Group: Sony Alpha Grid Menu & Camera Settings
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // AGC LibPatcher Button
-            FilledTonalIconButton(
-                onClick = onToggleAgc,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = buttonContainerColor,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ),
-                modifier = Modifier
-                    .size(42.dp)
-                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
-            ) {
-                Text(
-                    text = "AGC",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            // Sony Alpha Composition Grid Dropdown Button
+            Box {
+                FilledTonalIconButton(
+                    onClick = { showGridMenu = true },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = buttonContainerColor,
+                        contentColor = if (gridEnabled && gridType != GridType.NONE) MaterialTheme.colorScheme.primary else Color.White,
+                    ),
+                    modifier = Modifier
+                        .size(40.dp)
+                        .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
+                ) {
+                    Icon(
+                        imageVector = if (gridEnabled && gridType != GridType.NONE) Icons.Default.GridOn else Icons.Default.GridOff,
+                        contentDescription = "Sony Alpha Grid Guides",
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
 
-            // Grid Toggle Button
-            FilledTonalIconButton(
-                onClick = onToggleGrid,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = buttonContainerColor,
-                    contentColor = if (gridEnabled) MaterialTheme.colorScheme.primary else Color.White,
-                ),
-                modifier = Modifier
-                    .size(42.dp)
-                    .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GridOn,
-                    contentDescription = "Grid",
-                    modifier = Modifier.size(20.dp),
-                )
+                DropdownMenu(
+                    expanded = showGridMenu,
+                    onDismissRequest = { showGridMenu = false },
+                    modifier = Modifier
+                        .background(Color(0xFF1E1E1E))
+                        .widthIn(min = 230.dp)
+                ) {
+                    Text(
+                        text = "GRID GUIDES (SONY ALPHA)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+
+                    GridType.entries.forEach { type ->
+                        val isSelected = (gridEnabled && gridType == type) || (!gridEnabled && type == GridType.NONE)
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = type.label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                    )
+                                    Text(
+                                        text = type.subtitle,
+                                        fontSize = 10.sp,
+                                        color = Color.White.copy(alpha = 0.6f)
+                                    )
+                                }
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            },
+                            onClick = {
+                                onSelectGrid(type)
+                                showGridMenu = false
+                            }
+                        )
+                    }
+                }
             }
 
             // Camera Settings Button
@@ -200,13 +356,13 @@ fun TopQuickSettingsBar(
                     contentColor = Color.White,
                 ),
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(40.dp)
                     .then(if (isFull) Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape) else Modifier),
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "Camera Settings",
-                    modifier = Modifier.size(20.dp),
+                    contentDescription = "Settings",
+                    modifier = Modifier.size(19.dp),
                 )
             }
         }

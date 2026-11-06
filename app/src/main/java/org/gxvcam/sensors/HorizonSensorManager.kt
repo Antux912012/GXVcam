@@ -7,18 +7,25 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import kotlin.math.atan2
 
+/**
+ * Calibrated Gyro/Gravity horizon leveler based on Motorola Camera 5 (MotCamera5)
+ * [MultiSensorOrientationEventListener] and [LevelerComponent] logic.
+ */
 class HorizonSensorManager(
     context: Context,
     private val onTiltChanged: (Float) -> Unit
 ) : SensorEventListener {
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    // Motorola Camera 5 prefers Sensor.TYPE_GRAVITY (ID 9), falls back to Accelerometer (ID 1)
     private val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
         ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-    private var smoothedAngle: Float = 0f
-    private var isFirstSample: Boolean = true
-    private val alpha: Float = 0.15f
+    // Motorola Cam 5 rolling average filter (pool size = 10)
+    private val poolSize = 10
+    private val orientationPool = FloatArray(poolSize)
+    private var poolIndex = 0
+    private var poolCount = 0
 
     fun start() {
         val targetSensor = sensor ?: return
@@ -27,22 +34,56 @@ class HorizonSensorManager(
 
     fun stop() {
         sensorManager.unregisterListener(this)
+        poolCount = 0
+        poolIndex = 0
     }
 
     override fun onSensorChanged(event: SensorEvent) {
         val x = event.values[0]
         val y = event.values[1]
+        val z = event.values[2]
 
-        val rawDegrees = atan2(x.toDouble(), y.toDouble()).toFloat() * (180f / Math.PI.toFloat())
+        // 1. Motorola Cam 5 Planar check: if phone is lying flat on table or tilted > 60° towards floor/ceiling
+        // 4.0f * (x^2 + y^2) < z^2
+        val xySquared = x * x + y * y
+        val zSquared = z * z
+        val isPlanar = 4.0f * xySquared < zSquared
 
-        if (isFirstSample) {
-            smoothedAngle = rawDegrees
-            isFirstSample = false
-        } else {
-            smoothedAngle += alpha * (rawDegrees - smoothedAngle)
+        if (isPlanar) {
+            // When tilted flat facing floor or ceiling, horizon line is centered / neutral
+            onTiltChanged(0f)
+            return
         }
 
-        onTiltChanged(smoothedAngle)
+        // 2. Motorola Cam 5 orientation angle calculation:
+        // atan2(y, -x) * 57.29577951308232 (180/PI)
+        val angleRad = atan2(y.toDouble(), -x.toDouble())
+        var deg = Math.round(angleRad * 57.29577951308232).toInt()
+        deg = 90 - deg
+        while (deg >= 360) deg -= 360
+        while (deg < 0) deg += 360
+
+        // 3. Normalize relative to nearest 90-degree cardinal orientation
+        val relativeRoll = when {
+            deg in 0..45 -> deg.toFloat()
+            deg in 315..360 -> (deg - 360).toFloat()
+            deg in 46..135 -> (deg - 90).toFloat() // Landscape 90°
+            deg in 225..314 -> (deg - 270).toFloat() // Landscape 270°
+            else -> (deg - 180).toFloat() // Upside down 180°
+        }
+
+        // 4. Moving average smoothing pool (Motorola Cam 5 mOrientationPool)
+        orientationPool[poolIndex] = relativeRoll
+        poolIndex = (poolIndex + 1) % poolSize
+        if (poolCount < poolSize) poolCount++
+
+        var sum = 0f
+        for (i in 0 until poolCount) {
+            sum += orientationPool[i]
+        }
+        val smoothed = sum / poolCount
+
+        onTiltChanged(smoothed)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {

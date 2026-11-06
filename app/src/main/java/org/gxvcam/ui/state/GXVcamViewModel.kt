@@ -90,8 +90,31 @@ class GXVcamViewModel : ViewModel() {
             is GXVcamEvent.CycleAspectRatio -> handleCycleAspectRatio()
             is GXVcamEvent.OnCycleAspectRatio -> handleCycleAspectRatio()
 
-            is GXVcamEvent.ToggleGrid -> _uiState.update { it.copy(gridEnabled = !it.gridEnabled) }
-            is GXVcamEvent.OnToggleGrid -> _uiState.update { it.copy(gridEnabled = !it.gridEnabled) }
+            is GXVcamEvent.SetGridType -> {
+                _uiState.update {
+                    it.copy(
+                        manualSettings = it.manualSettings.copy(gridType = event.gridType),
+                        gridEnabled = (event.gridType != GridType.NONE)
+                    )
+                }
+            }
+            is GXVcamEvent.ToggleGrid,
+            is GXVcamEvent.OnToggleGrid -> {
+                val next = when (_uiState.value.manualSettings.gridType) {
+                    GridType.NONE -> GridType.RULE_OF_THIRDS
+                    GridType.RULE_OF_THIRDS -> GridType.SQUARE
+                    GridType.SQUARE -> GridType.DIAG_SQUARE
+                    GridType.DIAG_SQUARE -> GridType.GOLDEN_RATIO
+                    GridType.GOLDEN_RATIO -> GridType.CROSSHAIR
+                    GridType.CROSSHAIR -> GridType.NONE
+                }
+                _uiState.update {
+                    it.copy(
+                        manualSettings = it.manualSettings.copy(gridType = next),
+                        gridEnabled = (next != GridType.NONE)
+                    )
+                }
+            }
 
             is GXVcamEvent.UpdateProSettings -> {
                 _uiState.update { it.copy(proSettings = event.settings) }
@@ -185,7 +208,23 @@ class GXVcamViewModel : ViewModel() {
             }
 
             is GXVcamEvent.OnTapToFocus -> {
-                controller?.triggerTapToFocus(event.x, event.y)
+                _uiState.update { it.copy(isAeAfLocked = false, tapFocusEvOffset = 0f) }
+                controller?.triggerTapToFocus(event.x, event.y, isLocked = false)
+            }
+
+            is GXVcamEvent.SetAeAfLock -> {
+                _uiState.update { it.copy(isAeAfLocked = event.locked) }
+                if (event.locked) {
+                    controller?.triggerTapToFocus(event.x, event.y, isLocked = true)
+                } else {
+                    controller?.unlockAeAf()
+                }
+            }
+
+            is GXVcamEvent.SetTapFocusEv -> {
+                val evInt = Math.round(event.ev).toInt()
+                _uiState.update { it.copy(tapFocusEvOffset = event.ev, proSettings = it.proSettings.copy(evIndex = evInt)) }
+                controller?.setExposureCompensation(evInt)
             }
 
             is GXVcamEvent.OnShutterClicked -> {

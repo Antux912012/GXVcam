@@ -1,85 +1,183 @@
+<div align="center">
+
+<img src="docs/assets/icon.png" alt="GXVcam icon" width="120" />
+
 # GXVcam
 
-<p align="center">
-  <img src="docs/assets/icon.png" width="144" height="144" alt="GXVcam Icon" />
-</p>
+**A computational-photography camera app for the Motorola Edge 50 Neo and Edge 60 Neo.**
 
-Camera app for **Android 14+ / Android 16 (SDK 36)** targeting the **Motorola Edge 50 Neo** (Dimensity 7300, tested on Android 16)
-and **Edge 60 Neo** (Dimensity 7400, Android 15/16):
+GCam-style interface · burst RAW fusion · vivo-like colour rendering · MediaTek-aware capture
 
-* **GCam-style interface**: own implementation in Jetpack Compose (no Google code/assets).
-* **Burst RAW fusion** based on published HDR+ / multi-frame super-resolution research.
-* **vivo-like rendering** (Natural / Vivid looks, restrained highlights, natural skin),
-  achieved by our own calibration against reference photos (no vivo code/data).
-* **MediaTek-aware capture**: correct RAW10/RAW16 handling, per-frame dynamic black level,
-  Camera2 Extensions and any vendor tags the HAL actually exposes.
+[![Release](https://img.shields.io/badge/release-v0.3.2-blue)](https://github.com/Antux912012/GXVcam/releases/tag/v0.3.2)
+[![Android](https://img.shields.io/badge/Android-14%2B%20%2F%2016-3DDC84)](#requirements)
+[![License](https://img.shields.io/badge/license-MIT%20%2B%20GPLv3-lightgrey)](#license)
 
-See [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) for the limits on reusing GCam/vivo.
+[**Download APK**](https://github.com/Antux912012/GXVcam/releases/download/v0.3.2/GXVcam-v0.3.2.apk) ·
+[Features](#features) ·
+[Build & test](#build--test) ·
+[Legal](#legal-notes)
 
-## Download & Releases
+</div>
 
-Pre-built APKs are available under GitHub Releases:
-* [**Download latest GXVcam APK (v0.3.2)**](https://github.com/Antux912012/GXVcam/releases/download/v0.3.2/GXVcam-v0.3.2.apk)
+---
 
-## Features & Status
+## Overview
 
-| Area | State | Highlights |
-| :--- | :--- | :--- |
-| **Motorola Flagship Parity (v0.3.2)** | ✅ Reverse-Engineered from MotCamera5 | **4-Prime Portrait Lens Deck** (24mm Wide, 35mm Standard, 50mm Full View, 85mm Close-Up) with variable Bokeh Aperture slider (`ƒ/1.2`–`ƒ/16`) and LRA haptic ratchets; **Contextual Auto Macro Viewfinder Badge** (`[ ✿ Auto Macro ]`) with 1-tap lock and ultra-wide close-up focus; **Contextual Auto Night Vision Badge** (`[ 🌙 Auto NV ]`); **Motorola & Pantone Film Frame Watermarks** (Device stamp & dark film banner with official Pantone Poinciana `#E24938` swatch, EXIF shooting metadata stamp, and custom author signature). |
-| **Codebase Audit & Hardening (v0.3.1)** | ✅ Clean Architecture & Security Hardened | Complete audit eliminating duplicate legacy controllers (`Camera2Controller`), dead classes (`CameraDeviceConfig`, unreferenced `CameraScreen`), dead methods & imports; removed obsolete `Build.VERSION` checks for modern `minSdk 34`; migrated to `androidx.exifinterface` 1.4.2; hardened security (`allowBackup=false`, scoped intent URI permissions). |
-| **Continuous Smooth Zoom (up to 20x)** | ✅ iPhone / Vivo / MotCamera5 Smooth SAT | Continuous micrometric zoom from **0.6x to 20.0x** with intermediate steps (1.1x, 1.2x, 1.5x...); seamless **Spatial Alignment & Transition (SAT)** via MediaTek Logical Camera ID 5 transitioning smoothly across physical sensors (Ultra-Wide 16mm, Main Wide 24mm, In-Sensor Crop 48mm, and 3x Optical Telephoto 73mm) with **zero preview freeze or flicker**; **Interactive Precision Zoom Ruler** with Canvas ticks, single-step `−`/`+` micro-steppers, quick-jump chips (`.6`, `1.0`, `1.2`, `1.5`, `2.0`, `3.0`, `5.0`, `10x`, `20x`), active focal length in mm, and **Niagara-style LRA haptic ticks** (`EFFECT_TICK` on every 0.1x and `EFFECT_CLICK` on optical stops) |
-| **PIP & Dual Capture (Photo & Video)** | ✅ Complete MotCamera5 Dual-View Parity | Simultaneous front (32MP Samsung S5KJD1) and rear (50MP Sony IMX896) camera concurrent capture in **both Photo and Video modes**; **Draggable Picture-in-Picture (PIP)** floating window with rounded corners and drop shadow; **50:50 Split-Screen** mode with central divider; **Instant Camera Swap (`⇄`)** flipping primary and secondary feeds on the fly; High-res compositing of secondary feed into captured photos and 1080p concurrent video recording; Dispatched Motorola OEM HAL vendor tags (`is_dual_capture`, `pipzoomratio`, and `com.mediatek.streamingfeature.pipDevices`) |
-| **Motorola Camera 5 Video Suite** | ✅ Complete Edge 50 Neo OEM Parity | **4K UHD** (3840×2160), **1080p FHD**, and **720p HD** resolution selector; **30fps**, **60fps**, and **120fps Slow-Mo**; Motorola Video Stabilization (**Adaptive OIS+EIS** via `vstab_smarteis_enable`, **360° Horizon Lock** via `vstab_ihc_enable`, Off); **Video Night Vision** (`VideoNVwithoutVstab`); **HDR10+ 10-bit HLG** (`hdr10_mode_tuning`, `3d_hdr_mode`); and **Directional Audio Zoom** tracking lens zoom ratio |
-| **Gravity Sensor & Photo Orientation** | ✅ Google Photos Aligned | Dynamic gravity-sensor orientation listener mapping device tilt to `targetRotation` with physical bitmap rotation (90° portrait / horizontal landscape) and normalized EXIF orientation (`ORIENTATION_NORMAL = 1`), guaranteeing photos shot horizontally appear horizontal in Google Photos and galleries with zero rotation errors |
-| **Multi-Camera & Aux Sensors** | ✅ Verified on Edge 50 Neo | Bypasses `vendor.camera.aux.packagelist` to expose & bind Camera 0 (Main 50MP Sony IMX896), Camera 2 (13MP GalaxyCore GC13A2 Ultra-Wide 0.6x), Camera 3 (10MP Samsung S5K3K1 Telephoto 3x), and Camera 5 (Logical multi-camera) |
-| **Focus & Exposure (AE/AF Split Lock)** | ✅ Sony Alpha Separate AE & AF | Dedicated top-bar buttons for **AE** and **AF** reflecting active Sony Alpha shooting modes (`AF-C`, `AF-S`, `AF-Auto`, `AF-L`, `AF-M` / `AE-Multi`, `AE-Center`, `AE-Spot`, `AE-L`, `AE-M`); independent `[AE-L]` and `[AF-L]` viewfinder pills to lock/unlock exposure or focus separately |
-| **Tactile LRA Ratchet Feedback** | ✅ Niagara-Style Haptic Engine | Hardware Linear Resonant Actuator (LRA) ratchet vibration (`VibrationEffect.EFFECT_TICK`) across all sliders: Niagara expandable EV bar, Pro manual sliders (EV, ISO, Kelvin, Focus), JPEG quality compression slider, LibPatcher tuning sliders, and continuous zoom ruler |
-| **Sony Alpha Composition Grids** | ✅ 6 Precision Guides | Rule of 3rds (3×3), Square Grid (4×4), Diag. + Square (Sony Alpha signature diagonal guides), Golden Ratio (Phi), Center Crosshair, and Off |
-| **Calibrated Gyro Horizon Level** | ✅ MotCamera5 Algorithmic Calibration | Extracted from Motorola Camera 5 (`MultiSensorOrientationEventListener` & `LevelerComponent`) with planar desk detection and 10-sample rolling average smoothing |
-| **Aspect Ratios** | ✅ 5 Cinematic & Photo Ratios | 4:3, 16:9, 1:1 square, 3:2 classical 35mm, and 21:9 ultra-wide cinematic framing with M3 rounded corner viewfinders |
-| **Color Space & Imaging** | ✅ Professional Gamuts | sRGB, DCI-P3 Wide Gamut, and Adobe RGB with embedded ColorSpace metadata; Adjustable JPEG compression quality slider (50%–100%, default 85%) |
-| **Capture Formats** | ✅ 3-Way Mode | JPEG only, 16-bit uncompressed RAW (.dng) only, and simultaneous RAW + JPEG capture |
-| **M3 Expressive PRO Mode** | ✅ Complete & De-cluttered | Live parameter readout, instant AUTO reset per parameter & global RESET ALL, quick-stop chips (ISO 100–6400, Shutter 1/4000s–32s, White Balance modes + Kelvin slider, AF-C / Macro / Infinity); configurable sidebar (Left/Right) or strip (Top/Bottom) |
-| **Color Profile (LUT Engine)** | ✅ Top-Bar Dropdown | Moved from viewfinder carousel to top-left dropdown (Zeiss Natural, Leica Authentic/Vibrant, Vivo Vivid, GCam HDR+, Pantone, and LibPatcher) |
-| **MotCamera5 & GCam Settings** | ✅ Implemented | 50MP Quad-Bayer remosaic, ADRC dynamic range, Tintless lens shading, ZSL, Super Night, Anti-banding, Burst HDR+ frame count, Gyro Horizon level, RGB Histogram |
-| **Theming & Accents** | ✅ Pantone & Material 3 | Motorola Edge 50 Neo Pantone editions (Poinciana, Nautical Blue, Lattè, Grisaille), Leica Amber, Expressive Mint, and Material You dynamic wallpaper |
-| **Vulkan & RAW Pipeline** | ✅ Implemented | 16-bit RAW_SENSOR unpacker with Vulkan compute shader and CPU reference |
+GXVcam is an alternative camera app for MediaTek-based Motorola phones. It combines three ideas:
 
-## Layout
+- **GCam-style UX.** The interface is our own implementation in Jetpack Compose, following familiar interaction patterns. It uses no Google code or assets.
+- **Burst RAW fusion.** Multi-frame merging is based on published research (HDR+ and handheld multi-frame super-resolution).
+- **vivo-like rendering.** Natural and Vivid looks with restrained highlights and natural skin tones, achieved by calibrating our own tone curves and LUTs against reference photos. It uses no vivo code or data.
+
+Capture is MediaTek-aware: correct RAW10/RAW16 handling, per-frame dynamic black level, Camera2 Extensions, and any vendor tags the camera HAL actually exposes.
+
+## Supported devices
+
+| Device | SoC | Android | Status |
+|:--|:--|:--|:--|
+| Motorola Edge 50 Neo | MediaTek Dimensity 7300 | 16 | Tested |
+| Motorola Edge 60 Neo | MediaTek Dimensity 7400 | 15 / 16 | Targeted |
+
+### Requirements
+
+- Android 14 or newer (`minSdk 34`), built against Android 16 (SDK 36).
+- A device whose camera HAL exposes the sensors listed below. Per-device profiles live in [`configs/devices/`](configs/devices); they describe expectations, while runtime values always come from the HAL.
+
+## Download
+
+Pre-built APKs are published under [Releases](https://github.com/Antux912012/GXVcam/releases):
+
+**[GXVcam v0.3.2](https://github.com/Antux912012/GXVcam/releases/download/v0.3.2/GXVcam-v0.3.2.apk)**
+
+## Features
+
+### Capture
+
+| Area | Details |
+|:--|:--|
+| **Capture formats** | JPEG only, 16-bit uncompressed RAW (`.dng`) only, or RAW + JPEG simultaneously. |
+| **RAW pipeline** | 16-bit `RAW_SENSOR` unpacker with a Vulkan compute shader and a CPU reference implementation. |
+| **Imaging options** | 50MP Quad-Bayer remosaic, ADRC dynamic range, tintless lens shading, ZSL, Super Night, anti-banding, configurable burst HDR+ frame count. |
+| **Colour spaces** | sRGB, DCI-P3 and Adobe RGB with embedded colour-space metadata. JPEG quality slider 50–100 % (default 85 %). |
+| **Aspect ratios** | 4:3, 16:9, 1:1, 3:2 and 21:9. |
+| **Orientation** | Gravity-sensor listener maps device tilt to the target rotation and writes normalised EXIF orientation, so photos appear upright in Google Photos and other galleries. |
+
+### Lenses and zoom
+
+| Area | Details |
+|:--|:--|
+| **Multi-camera access** | Bypasses `vendor.camera.aux.packagelist` to expose and bind: Camera 0 (50MP Sony IMX896 main), Camera 2 (13MP GalaxyCore GC13A2 ultra-wide, 0.6x), Camera 3 (10MP Samsung S5K3K1 telephoto, 3x), Camera 5 (logical multi-camera). Verified on the Edge 50 Neo. |
+| **Continuous zoom, 0.6x–20x** | Seamless transitions across ultra-wide (16mm), main (24mm), in-sensor crop (48mm) and 3x telephoto (73mm) through MediaTek logical camera ID 5, without preview freeze or flicker. |
+| **Precision zoom ruler** | Canvas ruler with `−` / `+` micro-steppers, quick-jump chips (`.6`, `1.0`, `1.2`, `1.5`, `2.0`, `3.0`, `5.0`, `10x`, `20x`) and the active focal length in mm. |
+| **Portrait lens deck** | 24mm, 35mm, 50mm and 85mm looks with a bokeh aperture slider from ƒ/1.2 to ƒ/16. |
+| **Auto Macro / Auto NV** | Contextual viewfinder badges. Auto Macro can be locked with one tap and uses ultra-wide close-up focus. |
+
+### Dual capture (Picture-in-Picture)
+
+- Simultaneous front (32MP Samsung S5KJD1) and rear (50MP Sony IMX896) capture in both **Photo** and **Video** modes.
+- Draggable PIP window with rounded corners and shadow, or a **50:50 split-screen** layout.
+- Instant swap (`⇄`) of the primary and secondary feeds.
+- The secondary feed is composited into captured photos; video records at 1080p.
+- Dispatches the Motorola OEM HAL vendor tags `is_dual_capture`, `pipzoomratio` and `com.mediatek.streamingfeature.pipDevices`.
+
+### Video
+
+- **Resolutions:** 4K UHD (3840×2160), 1080p, 720p.
+- **Frame rates:** 30, 60 and 120 fps slow-mo.
+- **Stabilisation:** Adaptive OIS+EIS (`vstab_smarteis_enable`), 360° horizon lock (`vstab_ihc_enable`), or off.
+- **Video Night Vision** (`VideoNVwithoutVstab`).
+- **HDR10+ 10-bit HLG** (`hdr10_mode_tuning`, `3d_hdr_mode`).
+- **Directional audio zoom** that follows the lens zoom ratio.
+
+### Controls and interface
+
+| Area | Details |
+|:--|:--|
+| **Pro mode** | Live parameter read-out, per-parameter AUTO and global RESET ALL, quick-stop chips for ISO 100–6400, shutter 1/4000 s–32 s, white-balance modes with a Kelvin slider, and AF-C / Macro / Infinity. Sidebar (left/right) or strip (top/bottom) layout. |
+| **AE / AF split lock** | Separate top-bar buttons and viewfinder pills for exposure and focus. AF modes: `AF-C`, `AF-S`, `AF-Auto`, `AF-L`, `AF-M`. AE modes: `AE-Multi`, `AE-Center`, `AE-Spot`, `AE-L`, `AE-M`. `[AE-L]` and `[AF-L]` lock independently. |
+| **Colour profiles (LUT engine)** | Top-bar dropdown with Natural, Authentic/Vibrant, Vivid, HDR+ and Pantone-style profiles, plus a LibPatcher tuning profile. |
+| **Composition grids** | Rule of thirds (3×3), square (4×4), diagonal + square, golden ratio, centre crosshair, or off. |
+| **Gyro horizon level** | Planar desk detection and a 10-sample rolling average. |
+| **Haptics** | Hardware LRA ticks (`EFFECT_TICK`) on every slider, including EV, Pro sliders, JPEG quality, LibPatcher tuning and the zoom ruler. Optical zoom stops use `EFFECT_CLICK`. |
+| **Watermarks** | Device stamp, dark film-frame banner with a Pantone Poinciana (`#E24938`) swatch, EXIF shooting-data stamp, and a custom author signature. |
+| **Theming** | Pantone-inspired accents (Poinciana, Nautical Blue, Lattè, Grisaille), Leica Amber, Expressive Mint, and Material You dynamic colour. |
+
+## Project layout
 
 ```
 GXVcam/
-├── app/src/main/cpp/          native engine (C++20 + Vulkan)
-│   ├── include/               raw_pipeline.hpp, vivo_engine.hpp (stage interfaces)
-│   ├── src/raw_unpacker.cpp   CPU reference unpack/normalize
-│   ├── shaders/               unpack_raw10.comp
-│   └── tests/                 host unit tests
-├── configs/devices/           per-device profiles (expectations; runtime values come from HAL)
+├── app/                       Android app (Kotlin / Jetpack Compose UI)
+│   └── src/main/cpp/          native engine (C++20 + Vulkan)
+│       ├── include/           raw_pipeline.hpp, vivo_engine.hpp (stage interfaces)
+│       ├── src/               raw_unpacker.cpp (CPU reference unpack / normalise)
+│       ├── shaders/           unpack_raw10.comp
+│       └── tests/             host unit tests
+├── configs/devices/           per-device profiles (expectations; runtime values come from the HAL)
 ├── docs/                      ARCHITECTURE, MEDIATEK_OPTIMIZATION, IMAGING_PIPELINE, LEGAL_AND_SOURCES
+├── probe_out/edge50neo/       captured HAL probe output for the Edge 50 Neo
 └── tools/                     mtk_camera_probe.py, testdata/
 ```
 
-## Run what exists today
+## Build & test
+
+### Toolchain
+
+JDK 17, Android SDK (platform 35+ and build-tools; target SDK 36), NDK r27+, CMake 3.22+, Android Studio (or command-line tools with the Gradle wrapper), and `glslc` (ships with the NDK) for the shaders.
+
+### Native unit test (host, no phone needed)
 
 ```bash
-# Native unit test (host, no phone needed)
 cd app/src/main/cpp/tests
 g++ -std=c++20 -Wall -Wextra -I../include ../src/raw_unpacker.cpp test_raw_unpacker.cpp -o /tmp/gxv_test && /tmp/gxv_test
+```
 
-# Probe a connected phone (USB debugging on, RSA prompt accepted)
+### Camera probe
+
+Probe a connected phone (USB debugging on, RSA prompt accepted):
+
+```bash
 python3 tools/mtk_camera_probe.py -o probe_out/edge50neo
-# ...or parse a saved dump
+```
+
+Or parse a saved `dumpsys` dump instead:
+
+```bash
 python3 tools/mtk_camera_probe.py --from-file tools/testdata/dumpsys_sample.txt -o /tmp/probe
 ```
 
-## Dev environment (to install, see build plan Phase 0)
+### Build the app
 
-JDK 17, Android SDK (platform 35, build-tools 35), NDK r27+, CMake 3.22+, Android Studio
-(or cmdline-tools + Gradle wrapper), `glslc` (ships with the NDK) for shaders.
+```bash
+./gradlew assembleDebug
+```
+
+## Documentation
+
+| Document | Topic |
+|:--|:--|
+| `docs/ARCHITECTURE` | Overall app and native-engine design |
+| `docs/MEDIATEK_OPTIMIZATION` | MediaTek ISP / HAL specifics |
+| `docs/IMAGING_PIPELINE` | RAW fusion and rendering pipeline |
+| [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) | What may and may not be reused from GCam, vivo and open-source projects |
+
+## Legal notes
+
+GCam and vivo Camera are proprietary, so GXVcam **re-implements** their ideas rather than reusing them.
+
+- No GCam APKs or `.so` files, no vivo binaries, models, LUTs or tuning files.
+- No Google or vivo icons, sounds or animations. Material Symbols and Material 3 components are used instead.
+- Third-party names and logos (for example vivo, ZEISS, Pixel, Google Camera) must not appear in the app or in a store listing. "vivo-like" is used here only to describe the visual target.
+- Colour looks are calibrated from our own side-by-side reference photos (same scene, ColorChecker in frame).
+
+See [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) for the full list, including the open-source references the project draws on: the HDR+ paper, Handheld Multi-Frame Super-Resolution, `timothybrooks/hdr-plus`, PhotonCamera, Open Camera, MotionCam, `libultrahdr` and the Android camera samples.
 
 ## License
 
 GXVcam is dual-licensed:
-* **Core Codebase & Hardware Engine**: [MIT License](LICENSE) (`cpp/`, `camera/`, `sensors/`, `configs/`, `tools/`).
-* **User Interface**: [GNU General Public License v3.0 (GPLv3)](LICENSE) (`ui/`).
 
+| Part | Paths | License |
+|:--|:--|:--|
+| Core codebase and hardware engine | `cpp/`, `camera/`, `sensors/`, `configs/`, `tools/` | [MIT](LICENSE) |
+| User interface | `ui/` | [GPL-3.0](LICENSE) |
+
+Note that reusing code from GPL-licensed projects such as PhotonCamera or Open Camera would make the affected parts GPL-3.0.

@@ -13,8 +13,8 @@ android {
         applicationId = "org.gxvcam"
         minSdk = 34
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0-alpha01"
+        versionCode = 3
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

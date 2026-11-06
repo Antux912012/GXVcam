@@ -543,7 +543,50 @@ fun MotoVideoQuickBar(
                 tactile.triggerTick()
                 onUpdateVideo(videoSettings.copy(isDualCaptureEnabled = !videoSettings.isDualCaptureEnabled))
             },
-            label = { Text("Dual PIP") }
+            label = { Text(if (videoSettings.isDualCaptureEnabled) "Dual Cam ON" else "Dual Cam") },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         )
+
+        // Dual Capture Layout & Swap (Visible when Dual Capture is active)
+        if (videoSettings.isDualCaptureEnabled) {
+            FilterChip(
+                selected = true,
+                onClick = {
+                    tactile.triggerTick()
+                    val nextLayout = if (videoSettings.dualCaptureLayout == DualCaptureLayout.PIP) {
+                        DualCaptureLayout.SPLIT
+                    } else {
+                        DualCaptureLayout.PIP
+                    }
+                    onUpdateVideo(videoSettings.copy(dualCaptureLayout = nextLayout))
+                },
+                label = {
+                    Text(
+                        if (videoSettings.dualCaptureLayout == DualCaptureLayout.PIP) "Layout: PIP"
+                        else "Layout: Split 50:50"
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            )
+
+            FilterChip(
+                selected = videoSettings.isDualCaptureSwapped,
+                onClick = {
+                    tactile.triggerTick()
+                    onUpdateVideo(videoSettings.copy(isDualCaptureSwapped = !videoSettings.isDualCaptureSwapped))
+                },
+                label = { Text("Swap ⇄") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            )
+        }
     }
 }

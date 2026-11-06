@@ -330,6 +330,28 @@ class GXVcamViewModel : ViewModel() {
                 )
             }
 
+            is GXVcamEvent.SetDualCaptureLayout -> {
+                val newSettings = _uiState.value.motoVideoSettings.copy(dualCaptureLayout = event.layout)
+                _uiState.update { it.copy(motoVideoSettings = newSettings) }
+                controller?.applyMotoVideoSettings(
+                    settings = newSettings,
+                    zoomRatio = _uiState.value.currentZoomRatio,
+                    rollDegrees = _uiState.value.levelHorizonDegrees
+                )
+            }
+
+            is GXVcamEvent.ToggleDualCaptureSwap -> {
+                val newSettings = _uiState.value.motoVideoSettings.copy(
+                    isDualCaptureSwapped = !_uiState.value.motoVideoSettings.isDualCaptureSwapped
+                )
+                _uiState.update { it.copy(motoVideoSettings = newSettings) }
+                controller?.applyMotoVideoSettings(
+                    settings = newSettings,
+                    zoomRatio = _uiState.value.currentZoomRatio,
+                    rollDegrees = _uiState.value.levelHorizonDegrees
+                )
+            }
+
             is GXVcamEvent.UpdateAgcSettings -> {
                 _uiState.update { it.copy(agcSettings = event.settings) }
                 controller?.applyAgcSettings(event.settings, _uiState.value.activeLens)
@@ -504,6 +526,8 @@ class GXVcamViewModel : ViewModel() {
             activeLens = activeLens,
             cameraMode = mode,
             displayZoom = displayZoom,
+            isDualCapture = isVideo && _uiState.value.motoVideoSettings.isDualCaptureEnabled,
+            isDualCaptureSwapped = _uiState.value.motoVideoSettings.isDualCaptureSwapped,
         )
     }
 }

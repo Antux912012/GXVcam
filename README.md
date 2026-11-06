@@ -15,12 +15,13 @@ See [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) for the limits on r
 ## Download & Releases
 
 Pre-built APKs are available under GitHub Releases:
-* [**Download latest GXVcam APK (v0.2.0)**](https://github.com/Antux912012/GXVcam/releases/download/v0.2.0/GXVcam-v0.2.0.apk)
+* [**Download latest GXVcam APK (v0.3.0)**](https://github.com/Antux912012/GXVcam/releases/download/v0.3.0/GXVcam-v0.3.0.apk)
 
 ## Features & Status
 
 | Area | State | Highlights |
 | :--- | :--- | :--- |
+| **PIP Video & Dual Capture** | ✅ Complete MotCamera5 Dual-View Parity | Simultaneous front (32MP Samsung S5KJD1) and rear (50MP Sony IMX896) camera concurrent recording; **Draggable Picture-in-Picture (PIP)** floating window with rounded corners and drop shadow; **50:50 Split-Screen** mode with central divider; **Instant Camera Swap (`⇄`)** flipping primary and secondary feeds on the fly; Dispatched Motorola OEM HAL vendor tags (`is_dual_capture`, `pipzoomratio`, and `com.mediatek.streamingfeature.pipDevices`) |
 | **Motorola Camera 5 Video Suite** | ✅ Complete Edge 50 Neo OEM Parity | **4K UHD** (3840×2160), **1080p FHD**, and **720p HD** resolution selector; **30fps**, **60fps**, and **120fps Slow-Mo**; Motorola Video Stabilization (**Adaptive OIS+EIS** via `vstab_smarteis_enable`, **360° Horizon Lock** via `vstab_ihc_enable`, Off); **Video Night Vision** (`VideoNVwithoutVstab`); **HDR10+ 10-bit HLG** (`hdr10_mode_tuning`, `3d_hdr_mode`); and **Directional Audio Zoom** tracking lens zoom ratio |
 | **Gravity Sensor & Photo Orientation** | ✅ Google Photos Aligned | Dynamic gravity-sensor orientation listener mapping device tilt to `targetRotation` with physical bitmap rotation (90° portrait / horizontal landscape) and normalized EXIF orientation (`ORIENTATION_NORMAL = 1`), guaranteeing photos shot horizontally appear horizontal in Google Photos and galleries with zero rotation errors |
 | **Multi-Camera & Aux Sensors** | ✅ Verified on Edge 50 Neo | Bypasses `vendor.camera.aux.packagelist` to expose & bind Camera 0 (Main 50MP Sony IMX896), Camera 2 (13MP GalaxyCore GC13A2 Ultra-Wide 0.6x), Camera 3 (10MP Samsung S5K3K1 Telephoto 3x), and Camera 5 (Logical multi-camera) |

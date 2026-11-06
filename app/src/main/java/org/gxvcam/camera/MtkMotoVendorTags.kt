@@ -97,6 +97,15 @@ object MtkMotoVendorTags {
     val MOTO_VIDEO_SAT_4K60: CaptureRequest.Key<Int>? =
         createRequestKey("com.lenovo.moto.control.video_sat_4k60fps_support", Int::class.javaPrimitiveType)
 
+    val MOTO_IS_DUAL_CAPTURE: CaptureRequest.Key<Int>? =
+        createRequestKey("com.lenovo.moto.clientapp.is_dual_capture", Int::class.javaPrimitiveType)
+
+    val MOTO_PIP_ZOOM_RATIO: CaptureRequest.Key<Float>? =
+        createRequestKey("com.lenovo.moto.control.pipzoomratio", Float::class.javaPrimitiveType)
+
+    val MTK_PIP_DEVICES: CaptureRequest.Key<Int>? =
+        createRequestKey("com.mediatek.streamingfeature.pipDevices", Int::class.javaPrimitiveType)
+
     // Static Characteristics Keys
     val MOTO_VENDOR_EXPOSURE_RANGE: CameraCharacteristics.Key<LongArray>? =
         createCharacteristicKey("com.lenovo.moto.sensor.info.exposureTimeRange", LongArray::class.java)

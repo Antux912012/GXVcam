@@ -17,6 +17,29 @@ import org.gxvcam.ui.components.*
 import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.CameraMode
 import org.gxvcam.ui.state.GXVcamEvent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
+import org.gxvcam.ui.state.DualCaptureLayout
 import org.gxvcam.ui.state.GXVcamUiState
 import org.gxvcam.ui.state.GXVcamViewModel
 import org.gxvcam.ui.theme.GXVcamTheme
@@ -28,7 +51,8 @@ fun GXVcamScreen(
     viewModel: GXVcamViewModel = viewModel(),
     modifier: Modifier = Modifier,
     onOpenGallery: () -> Unit = {},
-    viewfinderContent: @Composable () -> Unit
+    viewfinderContent: @Composable () -> Unit,
+    secondaryViewfinderContent: (@Composable () -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -37,7 +61,8 @@ fun GXVcamScreen(
         onEvent = viewModel::onEvent,
         onOpenGallery = onOpenGallery,
         modifier = modifier,
-        viewfinderContent = viewfinderContent
+        viewfinderContent = viewfinderContent,
+        secondaryViewfinderContent = secondaryViewfinderContent
     )
 }
 
@@ -47,9 +72,25 @@ fun GXVcamScreenContent(
     onEvent: (GXVcamEvent) -> Unit,
     modifier: Modifier = Modifier,
     onOpenGallery: () -> Unit = {},
-    viewfinderContent: @Composable () -> Unit
+    viewfinderContent: @Composable () -> Unit,
+    secondaryViewfinderContent: (@Composable () -> Unit)? = null
 ) {
     val isFull = false
+    val isDualCaptureActive = uiState.currentMode == CameraMode.VIDEO &&
+            uiState.motoVideoSettings.isDualCaptureEnabled &&
+            secondaryViewfinderContent != null
+
+    val effectiveViewfinderContent: @Composable () -> Unit = {
+        if (isDualCaptureActive && uiState.motoVideoSettings.dualCaptureLayout == DualCaptureLayout.SPLIT) {
+            DualCaptureSplitView(
+                onSwap = { onEvent(GXVcamEvent.ToggleDualCaptureSwap) },
+                primaryContent = viewfinderContent,
+                secondaryContent = secondaryViewfinderContent
+            )
+        } else {
+            viewfinderContent()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -69,8 +110,19 @@ fun GXVcamScreenContent(
             isAeAfLocked = uiState.isAeAfLocked,
             onEvent = onEvent,
             modifier = Modifier.fillMaxSize(),
-            content = viewfinderContent
+            content = effectiveViewfinderContent
         )
+
+        // Motorola Dual Capture Floating PIP Window (Draggable, Rounded Corner, Instant Swap)
+        if (isDualCaptureActive && uiState.motoVideoSettings.dualCaptureLayout == DualCaptureLayout.PIP) {
+            DualCapturePipWindow(
+                onSwap = { onEvent(GXVcamEvent.ToggleDualCaptureSwap) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 110.dp, end = 16.dp),
+                content = secondaryViewfinderContent
+            )
+        }
 
         // Top Overlay: Live RGB Histogram in Pro Mode or when enabled in settings
         AnimatedVisibility(
@@ -263,6 +315,136 @@ fun GXVcamScreenContent(
                 onUpdateSettings = { onEvent(GXVcamEvent.UpdateManualSettings(it)) },
                 onDismiss = { onEvent(GXVcamEvent.ToggleSettingsSheet) }
             )
+        }
+    }
+}
+
+@Composable
+fun DualCapturePipWindow(
+    onSwap: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    val tactile = rememberTactileFeedback()
+
+    Box(
+        modifier = modifier
+            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+            .size(width = 120.dp, height = 160.dp)
+            .shadow(elevation = 16.dp, shape = RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount.x
+                    offsetY += dragAmount.y
+                }
+            }
+    ) {
+        content()
+
+        // Swap button on top-right of PIP window
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(6.dp)
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Color(0xAA000000))
+                .clickable {
+                    tactile.triggerTick()
+                    onSwap()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "⇄",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun DualCaptureSplitView(
+    onSwap: () -> Unit,
+    primaryContent: @Composable () -> Unit,
+    secondaryContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tactile = rememberTactileFeedback()
+
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Top half (Primary camera)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clipToBounds()
+        ) {
+            primaryContent()
+        }
+
+        // Center sleek divider with Swap button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .background(Color(0xDD121212)),
+            contentAlignment = Alignment.Center
+        ) {
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+
+            Surface(
+                onClick = {
+                    tactile.triggerTick()
+                    onSwap()
+                },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "⇄",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "Swap",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+
+        // Bottom half (Secondary camera)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clipToBounds()
+        ) {
+            secondaryContent()
         }
     }
 }

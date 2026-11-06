@@ -84,6 +84,11 @@ enum class VideoFrameRate(val fps: Int, val label: String) {
     SLOW_MO_120(120, "120fps")
 }
 
+enum class DualCaptureLayout(val label: String) {
+    PIP("PIP Window"),
+    SPLIT("Split 50:50")
+}
+
 @Immutable
 data class MotoVideoSettings(
     val resolution: VideoResolution = VideoResolution.UHD_4K,
@@ -93,6 +98,8 @@ data class MotoVideoSettings(
     val isHdr10BitEnabled: Boolean = false,
     val isAudioZoomEnabled: Boolean = true,
     val isDualCaptureEnabled: Boolean = false,
+    val dualCaptureLayout: DualCaptureLayout = DualCaptureLayout.PIP,
+    val isDualCaptureSwapped: Boolean = false,
 )
 
 enum class AgcColorProfile(
@@ -467,6 +474,8 @@ sealed interface GXVcamEvent {
     data class OnHardwareCapabilitiesUpdated(val capabilities: ProHardwareCapabilities) : GXVcamEvent
     data class OnRecordingDurationUpdated(val durationMs: Long) : GXVcamEvent
     data class OnDeviceOrientationChanged(val surfaceRotation: Int, val cardinalAngle: Int) : GXVcamEvent
+    data class SetDualCaptureLayout(val layout: DualCaptureLayout) : GXVcamEvent
+    data object ToggleDualCaptureSwap : GXVcamEvent
     data class ToggleLiveViewfinderLut(val enabled: Boolean) : GXVcamEvent
     data object ResetAgcToDefaults : GXVcamEvent
 }

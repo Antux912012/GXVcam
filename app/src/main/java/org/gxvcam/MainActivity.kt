@@ -93,17 +93,29 @@ class MainActivity : ComponentActivity() {
                         viewfinderContent = {
                             AndroidView(
                                 factory = { _ ->
-                                    cameraController.previewView.also { pv ->
+                                    val pv = cameraController.previewView
+                                    (pv.parent as? android.view.ViewGroup)?.removeView(pv)
+                                    pv.also {
                                         gxvViewModel.attachController(
                                             controller = cameraController,
                                             lifecycleOwner = this@MainActivity,
-                                            surfaceProvider = pv.surfaceProvider,
+                                            surfaceProvider = it.surfaceProvider,
                                         )
                                     }
                                 },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         },
+                        secondaryViewfinderContent = {
+                            AndroidView(
+                                factory = { _ ->
+                                    val pv = cameraController.secondaryPreviewView
+                                    (pv.parent as? android.view.ViewGroup)?.removeView(pv)
+                                    pv
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     )
                 } else {
                     PermissionRequestScreen {

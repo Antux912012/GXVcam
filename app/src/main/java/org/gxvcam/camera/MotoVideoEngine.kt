@@ -37,6 +37,11 @@ object MotoVideoEngine {
         setIfSupported(builder, MtkMotoVendorTags.MOTO_3D_HDR_MODE, hdrValue, supportedKeyNames)
         setIfSupported(builder, MtkMotoVendorTags.MOTO_VHDR_STATE, hdrValue, supportedKeyNames)
 
+        // 4. Motorola Edge 50 Neo Dual Capture / PIP Tag
+        val dualVal = if (settings.isDualCaptureEnabled) 1 else 0
+        setIfSupported(builder, MtkMotoVendorTags.MOTO_IS_DUAL_CAPTURE, dualVal, supportedKeyNames)
+        setIfSupported(builder, MtkMotoVendorTags.MTK_PIP_DEVICES, dualVal, supportedKeyNames)
+
         // 4. Motorola Edge 50 Neo Stabilization Pipeline (OIS + Smart EIS + 360° Horizon Lock)
         when (settings.stabilization) {
             MotoVideoStabilization.OFF -> {

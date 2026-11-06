@@ -432,12 +432,7 @@ fun CameraSettingsBottomSheet(
                         FilterChip(
                             selected = isSelected,
                             onClick = {
-                                onUpdateSettings(
-                                    settings.copy(
-                                        watermarkStyle = style,
-                                        isWatermarkEnabled = style != WatermarkStyle.OFF
-                                    )
-                                )
+                                onUpdateSettings(settings.copy(watermarkStyle = style))
                             },
                             label = { Text(style.label, fontSize = 11.sp, maxLines = 1) },
                             colors = FilterChipDefaults.filterChipColors(
@@ -574,12 +569,18 @@ fun CameraSettingsBottomSheet(
                 onCheckedChange = { onUpdateSettings(settings.copy(isHorizonLevelVisible = it)) },
             )
 
-            // Device Watermark
+            // Motorola contextual viewfinder pills (PHOTO mode)
             SettingsToggleCard(
-                title = "Photo Watermark",
-                description = "Embed 'GXVcam • Motorola Edge 50 Neo | LYT-700C' stamp.",
-                checked = settings.isWatermarkEnabled,
-                onCheckedChange = { onUpdateSettings(settings.copy(isWatermarkEnabled = it)) },
+                title = "Macro Pill",
+                description = "Show the ✿ Macro shortcut in Photo mode to lock the ultra-wide lens for close-ups.",
+                checked = settings.isAutoMacroEnabled,
+                onCheckedChange = { onUpdateSettings(settings.copy(isAutoMacroEnabled = it)) },
+            )
+            SettingsToggleCard(
+                title = "Night Vision Pill",
+                description = "Show the 🌙 Night shortcut in Photo mode to use the OEM Night extension without leaving Photo.",
+                checked = settings.isAutoNightVisionEnabled,
+                onCheckedChange = { onUpdateSettings(settings.copy(isAutoNightVisionEnabled = it)) },
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))

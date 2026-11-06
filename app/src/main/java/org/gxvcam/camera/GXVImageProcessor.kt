@@ -569,7 +569,7 @@ object GXVImageProcessor {
             gsum = 0
             bsum = 0
             yp = -radius * w
-            for (curI in -radius..radius) {
+            repeat(div) {
                 yi = curX + yp.coerceIn(0, (h - 1) * w)
                 rsum += r[yi]
                 gsum += g[yi]
@@ -609,7 +609,7 @@ object GXVImageProcessor {
     ) {
         when (style) {
             WatermarkStyle.OFF -> return
-            WatermarkStyle.DEVICE -> applyDeviceStampWatermark(canvas, width, height, signature, activeLens)
+            WatermarkStyle.DEVICE -> applyDeviceStampWatermark(canvas, width, height, signature)
             WatermarkStyle.FILM_FRAME -> applyPantoneFilmFrameWatermark(canvas, width, height, signature, activeLens, exifTags)
         }
     }
@@ -619,16 +619,14 @@ object GXVImageProcessor {
         width: Int,
         height: Int,
         signature: String,
-        activeLens: OpticalLens
     ) {
         val pad = width * 0.045f
         val bottomY = height - pad
-        val leftX = pad
 
         // Motorola Batwing circular badge
         val iconRadius = width * 0.024f
         val iconCenterY = bottomY - iconRadius
-        val iconCenterX = leftX + iconRadius
+        val iconCenterX = pad + iconRadius
 
         val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE

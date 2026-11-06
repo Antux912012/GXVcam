@@ -363,7 +363,6 @@ data class CameraManualSettings(
     val colorSpace: ColorSpaceOption = ColorSpaceOption.SRGB,
     val jpegQuality: Int = 85,
     val hdrFrameCount: Int = 8,
-    val isWatermarkEnabled: Boolean = false,
     val watermarkStyle: WatermarkStyle = WatermarkStyle.OFF,
     val watermarkSignature: String = "",
     val isAutoMacroEnabled: Boolean = true,
@@ -450,12 +449,8 @@ data class GXVcamUiState(
     val activePortraitLens: MotoPortraitLens = MotoPortraitLens.STANDARD_35MM,
     val portraitAperture: Float = 2.8f,
     val isPortraitApertureExpanded: Boolean = false,
-    val isAutoMacroEnabled: Boolean = true,
     val isMacroLocked: Boolean = false,
-    val isAutoNightVisionEnabled: Boolean = true,
     val isAutoNightVisionActive: Boolean = false,
-    val watermarkStyle: WatermarkStyle = WatermarkStyle.OFF,
-    val watermarkCustomSignature: String = ""
 ) {
     val isAeAfLocked: Boolean get() = isAeLocked && isAfLocked
 }
@@ -529,6 +524,4 @@ sealed interface GXVcamEvent {
     data class SetPortraitApertureExpanded(val expanded: Boolean) : GXVcamEvent
     data object ToggleMacroLock : GXVcamEvent
     data object ToggleAutoNightVision : GXVcamEvent
-    data class SetWatermarkStyle(val style: WatermarkStyle) : GXVcamEvent
-    data class SetWatermarkSignature(val signature: String) : GXVcamEvent
 }

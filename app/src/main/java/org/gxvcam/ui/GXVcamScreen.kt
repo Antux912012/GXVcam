@@ -256,9 +256,11 @@ fun GXVcamScreenContent(
                 }
             }
 
-            // Motorola Contextual Badges: Auto Macro & Auto Night Vision in PHOTO Mode
+            // Motorola Contextual Badges: Macro lock & Night Vision in PHOTO Mode
+            val showMacroPill = uiState.manualSettings.isAutoMacroEnabled
+            val showNightPill = uiState.manualSettings.isAutoNightVisionEnabled
             AnimatedVisibility(
-                visible = uiState.currentMode == CameraMode.PHOTO,
+                visible = uiState.currentMode == CameraMode.PHOTO && (showMacroPill || showNightPill),
                 enter = fadeIn(GXVMotion.fastEffects()),
                 exit = fadeOut(GXVMotion.fastEffects())
             ) {
@@ -270,7 +272,7 @@ fun GXVcamScreenContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Macro Pill
-                    Surface(
+                    if (showMacroPill) Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.primaryContainer else Color(0x66000000),
                         border = BorderStroke(1.dp, if (uiState.isMacroLocked) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.20f)),
@@ -289,7 +291,7 @@ fun GXVcamScreenContent(
                                 color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.primary else Color.White
                             )
                             Text(
-                                text = if (uiState.isMacroLocked) "Macro ON" else "Auto Macro",
+                                text = if (uiState.isMacroLocked) "Macro ON" else "Macro",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
@@ -297,10 +299,10 @@ fun GXVcamScreenContent(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    if (showMacroPill && showNightPill) Spacer(modifier = Modifier.width(8.dp))
 
-                    // Auto Night Vision Pill
-                    Surface(
+                    // Night Vision Pill (rebinds PHOTO with the OEM Night extension)
+                    if (showNightPill) Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = if (uiState.isAutoNightVisionActive) Color(0xCCFFB74D) else Color(0x66000000),
                         border = BorderStroke(1.dp, if (uiState.isAutoNightVisionActive) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.20f)),
@@ -315,7 +317,7 @@ fun GXVcamScreenContent(
                         ) {
                             Text(text = "🌙", fontSize = 11.sp)
                             Text(
-                                text = if (uiState.isAutoNightVisionActive) "Auto NV (2s)" else "Auto NV",
+                                text = if (uiState.isAutoNightVisionActive) "Night ON" else "Night",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (uiState.isAutoNightVisionActive) Color.Black else Color.White

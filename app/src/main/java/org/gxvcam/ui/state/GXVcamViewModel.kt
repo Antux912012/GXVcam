@@ -45,6 +45,11 @@ class GXVcamViewModel : ViewModel() {
             onEvent(GXVcamEvent.UpdateHistogram(histogram))
         }
 
+        // Re-sync state that survives in the ViewModel when a new controller is attached
+        // (e.g. after Activity recreation), so captures keep the user's watermark/bokeh choices.
+        controller.portraitAperture = _uiState.value.portraitAperture
+        controller.applyManualSettings(_uiState.value.manualSettings)
+
         rebindCamera()
     }
 
@@ -79,8 +84,14 @@ class GXVcamViewModel : ViewModel() {
             is GXVcamEvent.SelectLens -> handleLensSelected(event.lens)
             is GXVcamEvent.OnLensSelected -> handleLensSelected(event.lens)
 
-            is GXVcamEvent.SetZoomRatio -> handleZoomChanged(event.zoom)
-            is GXVcamEvent.OnZoomChanged -> handleZoomChanged(event.zoomRatio)
+            is GXVcamEvent.SetZoomRatio -> {
+                _uiState.update { it.copy(isMacroLocked = false) }
+                handleZoomChanged(event.zoom)
+            }
+            is GXVcamEvent.OnZoomChanged -> {
+                _uiState.update { it.copy(isMacroLocked = false) }
+                handleZoomChanged(event.zoomRatio)
+            }
             is GXVcamEvent.SetZoomSliderExpanded -> {
                 _uiState.update { it.copy(isZoomSliderExpanded = event.expanded) }
             }
@@ -462,21 +473,10 @@ class GXVcamViewModel : ViewModel() {
 
             is GXVcamEvent.ToggleAutoNightVision -> {
                 _uiState.update { it.copy(isAutoNightVisionActive = !it.isAutoNightVisionActive) }
-            }
-
-            is GXVcamEvent.SetWatermarkStyle -> {
-                val updated = _uiState.value.manualSettings.copy(
-                    watermarkStyle = event.style,
-                    isWatermarkEnabled = event.style != WatermarkStyle.OFF
-                )
-                _uiState.update { it.copy(watermarkStyle = event.style, manualSettings = updated) }
-                controller?.applyManualSettings(updated)
-            }
-
-            is GXVcamEvent.SetWatermarkSignature -> {
-                val updated = _uiState.value.manualSettings.copy(watermarkSignature = event.signature)
-                _uiState.update { it.copy(watermarkCustomSignature = event.signature, manualSettings = updated) }
-                controller?.applyManualSettings(updated)
+                // Rebind so PHOTO uses the OEM Night extension (same path as NIGHT mode)
+                if (_uiState.value.currentMode == CameraMode.PHOTO) {
+                    rebindCamera()
+                }
             }
         }
     }
@@ -491,14 +491,16 @@ class GXVcamViewModel : ViewModel() {
                     currentMode = mode,
                     activeLens = optLens,
                     currentZoomRatio = pLens.zoomRatio,
-                    isProPanelExpanded = false
+                    isProPanelExpanded = false,
+                    isMacroLocked = false,
                 )
             }
         } else {
             _uiState.update {
                 it.copy(
                     currentMode = mode,
-                    isProPanelExpanded = mode == CameraMode.PRO
+                    isProPanelExpanded = mode == CameraMode.PRO,
+                    isMacroLocked = mode == previousMode && it.isMacroLocked,
                 )
             }
         }
@@ -573,6 +575,12 @@ class GXVcamViewModel : ViewModel() {
         displayZoom: Float = _uiState.value.currentZoomRatio,
     ) {
         val isVideo = mode == CameraMode.VIDEO
+        // PHOTO + Night Vision pill binds through the same OEM Night extension as NIGHT mode
+        val bindMode = if (mode == CameraMode.PHOTO && _uiState.value.isAutoNightVisionActive) {
+            CameraMode.NIGHT
+        } else {
+            mode
+        }
         controller?.bindCamera(
             isBackCamera = isBackCamera,
             aspectRatio = aspectRatio,
@@ -580,7 +588,7 @@ class GXVcamViewModel : ViewModel() {
             enableRawJpeg = mode == CameraMode.PRO && rawAndJpeg,
             isVideoMode = isVideo,
             activeLens = activeLens,
-            cameraMode = mode,
+            cameraMode = bindMode,
             displayZoom = displayZoom,
             isDualCapture = (isVideo || mode == CameraMode.PHOTO) && _uiState.value.motoVideoSettings.isDualCaptureEnabled,
             isDualCaptureSwapped = _uiState.value.motoVideoSettings.isDualCaptureSwapped,

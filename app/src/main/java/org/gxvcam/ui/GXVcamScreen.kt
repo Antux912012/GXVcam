@@ -256,6 +256,75 @@ fun GXVcamScreenContent(
                 }
             }
 
+            // Motorola Contextual Badges: Auto Macro & Auto Night Vision in PHOTO Mode
+            AnimatedVisibility(
+                visible = uiState.currentMode == CameraMode.PHOTO,
+                enter = fadeIn(GXVMotion.fastEffects()),
+                exit = fadeOut(GXVMotion.fastEffects())
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Macro Pill
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.primaryContainer else Color(0x66000000),
+                        border = BorderStroke(1.dp, if (uiState.isMacroLocked) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.20f)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onEvent(GXVcamEvent.ToggleMacroLock) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "✿",
+                                fontSize = 12.sp,
+                                color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.primary else Color.White
+                            )
+                            Text(
+                                text = if (uiState.isMacroLocked) "Macro ON" else "Auto Macro",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Auto Night Vision Pill
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (uiState.isAutoNightVisionActive) Color(0xCCFFB74D) else Color(0x66000000),
+                        border = BorderStroke(1.dp, if (uiState.isAutoNightVisionActive) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.20f)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onEvent(GXVcamEvent.ToggleAutoNightVision) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(text = "🌙", fontSize = 11.sp)
+                            Text(
+                                text = if (uiState.isAutoNightVisionActive) "Auto NV (2s)" else "Auto NV",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (uiState.isAutoNightVisionActive) Color.Black else Color.White
+                            )
+                        }
+                    }
+                }
+            }
+
             // Moto Cam 5 Video Quick Bar (shown when in Video mode)
             AnimatedVisibility(
                 visible = uiState.currentMode == CameraMode.VIDEO,
@@ -347,16 +416,28 @@ fun GXVcamScreenContent(
 
 
 
-            // M3 Expressive Lens Pill Selector
-            ExpressiveLensSelector(
-                activeLens = uiState.activeLens,
-                currentZoomRatio = uiState.currentZoomRatio,
-                onLensSelected = { onEvent(GXVcamEvent.OnLensSelected(it)) },
-                onZoomChanged = { onEvent(GXVcamEvent.OnZoomChanged(it)) },
-                isExpanded = uiState.isZoomSliderExpanded,
-                onExpandedChange = { onEvent(GXVcamEvent.SetZoomSliderExpanded(it)) },
-                isFull = isFull
-            )
+            // M3 Expressive Lens Pill Selector or Motorola 4-Prime Portrait Deck
+            if (uiState.currentMode == CameraMode.PORTRAIT) {
+                MotoPortraitDeck(
+                    activeLens = uiState.activePortraitLens,
+                    aperture = uiState.portraitAperture,
+                    isApertureExpanded = uiState.isPortraitApertureExpanded,
+                    onLensSelected = { onEvent(GXVcamEvent.SelectPortraitLens(it)) },
+                    onApertureChanged = { onEvent(GXVcamEvent.SetPortraitAperture(it)) },
+                    onToggleApertureExpanded = { onEvent(GXVcamEvent.SetPortraitApertureExpanded(it)) },
+                    isFull = isFull
+                )
+            } else {
+                ExpressiveLensSelector(
+                    activeLens = uiState.activeLens,
+                    currentZoomRatio = uiState.currentZoomRatio,
+                    onLensSelected = { onEvent(GXVcamEvent.OnLensSelected(it)) },
+                    onZoomChanged = { onEvent(GXVcamEvent.OnZoomChanged(it)) },
+                    isExpanded = uiState.isZoomSliderExpanded,
+                    onExpandedChange = { onEvent(GXVcamEvent.SetZoomSliderExpanded(it)) },
+                    isFull = isFull
+                )
+            }
 
             // Primary Morphing Shutter & Mode Deck
             BottomControlDeck(

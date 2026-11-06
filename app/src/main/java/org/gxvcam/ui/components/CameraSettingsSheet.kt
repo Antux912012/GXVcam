@@ -26,6 +26,7 @@ import org.gxvcam.ui.state.CaptureFormat
 import org.gxvcam.ui.state.ColorSpaceOption
 import org.gxvcam.ui.state.GridType
 import org.gxvcam.ui.state.ProLayoutPosition
+import org.gxvcam.ui.state.WatermarkStyle
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
 import kotlin.math.roundToInt
 
@@ -400,6 +401,63 @@ fun CameraSettingsBottomSheet(
                             modifier = Modifier.weight(1f),
                         )
                     }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // Motorola Watermark & Branding
+            SettingsSectionHeader(
+                icon = Icons.Default.Verified,
+                title = "Motorola Watermark & Branding",
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Photo Watermark Style",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Imprint photos with the iconic Motorola batwing logo or the official Pantone film frame banner",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    WatermarkStyle.entries.forEach { style ->
+                        val isSelected = settings.watermarkStyle == style
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                onUpdateSettings(
+                                    settings.copy(
+                                        watermarkStyle = style,
+                                        isWatermarkEnabled = style != WatermarkStyle.OFF
+                                    )
+                                )
+                            },
+                            label = { Text(style.label, fontSize = 11.sp, maxLines = 1) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                if (settings.watermarkStyle != WatermarkStyle.OFF) {
+                    OutlinedTextField(
+                        value = settings.watermarkSignature,
+                        onValueChange = { onUpdateSettings(settings.copy(watermarkSignature = it)) },
+                        label = { Text("Custom Signature / Author Name") },
+                        placeholder = { Text("e.g. Antonio De Gaetano") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 

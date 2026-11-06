@@ -19,12 +19,13 @@ See [`docs/LEGAL_AND_SOURCES.md`](docs/LEGAL_AND_SOURCES.md) for the limits on r
 ## Download & Releases
 
 Pre-built APKs are available under GitHub Releases:
-* [**Download latest GXVcam APK (v0.3.1)**](https://github.com/Antux912012/GXVcam/releases/download/v0.3.1/GXVcam-v0.3.1.apk)
+* [**Download latest GXVcam APK (v0.3.2)**](https://github.com/Antux912012/GXVcam/releases/download/v0.3.2/GXVcam-v0.3.2.apk)
 
 ## Features & Status
 
 | Area | State | Highlights |
 | :--- | :--- | :--- |
+| **Motorola Flagship Parity (v0.3.2)** | ✅ Reverse-Engineered from MotCamera5 | **4-Prime Portrait Lens Deck** (24mm Wide, 35mm Standard, 50mm Full View, 85mm Close-Up) with variable Bokeh Aperture slider (`ƒ/1.2`–`ƒ/16`) and LRA haptic ratchets; **Contextual Auto Macro Viewfinder Badge** (`[ ✿ Auto Macro ]`) with 1-tap lock and ultra-wide close-up focus; **Contextual Auto Night Vision Badge** (`[ 🌙 Auto NV ]`); **Motorola & Pantone Film Frame Watermarks** (Device stamp & dark film banner with official Pantone Poinciana `#E24938` swatch, EXIF shooting metadata stamp, and custom author signature). |
 | **Codebase Audit & Hardening (v0.3.1)** | ✅ Clean Architecture & Security Hardened | Complete audit eliminating duplicate legacy controllers (`Camera2Controller`), dead classes (`CameraDeviceConfig`, unreferenced `CameraScreen`), dead methods & imports; removed obsolete `Build.VERSION` checks for modern `minSdk 34`; migrated to `androidx.exifinterface` 1.4.2; hardened security (`allowBackup=false`, scoped intent URI permissions). |
 | **Continuous Smooth Zoom (up to 20x)** | ✅ iPhone / Vivo / MotCamera5 Smooth SAT | Continuous micrometric zoom from **0.6x to 20.0x** with intermediate steps (1.1x, 1.2x, 1.5x...); seamless **Spatial Alignment & Transition (SAT)** via MediaTek Logical Camera ID 5 transitioning smoothly across physical sensors (Ultra-Wide 16mm, Main Wide 24mm, In-Sensor Crop 48mm, and 3x Optical Telephoto 73mm) with **zero preview freeze or flicker**; **Interactive Precision Zoom Ruler** with Canvas ticks, single-step `−`/`+` micro-steppers, quick-jump chips (`.6`, `1.0`, `1.2`, `1.5`, `2.0`, `3.0`, `5.0`, `10x`, `20x`), active focal length in mm, and **Niagara-style LRA haptic ticks** (`EFFECT_TICK` on every 0.1x and `EFFECT_CLICK` on optical stops) |
 | **PIP & Dual Capture (Photo & Video)** | ✅ Complete MotCamera5 Dual-View Parity | Simultaneous front (32MP Samsung S5KJD1) and rear (50MP Sony IMX896) camera concurrent capture in **both Photo and Video modes**; **Draggable Picture-in-Picture (PIP)** floating window with rounded corners and drop shadow; **50:50 Split-Screen** mode with central divider; **Instant Camera Swap (`⇄`)** flipping primary and secondary feeds on the fly; High-res compositing of secondary feed into captured photos and 1080p concurrent video recording; Dispatched Motorola OEM HAL vendor tags (`is_dual_capture`, `pipzoomratio`, and `com.mediatek.streamingfeature.pipDevices`) |

@@ -11,12 +11,17 @@ import android.graphics.Shader
 import androidx.exifinterface.media.ExifInterface
 import android.util.Log
 import android.graphics.BitmapShader
+import android.graphics.Color
+import android.graphics.ComposeShader
+import android.graphics.PorterDuff
 import android.graphics.RectF
+import android.graphics.Typeface
 import org.gxvcam.ui.state.AgcColorProfile
 import org.gxvcam.ui.state.AspectRatio
 import org.gxvcam.ui.state.ColorSpaceOption
 import org.gxvcam.ui.state.DualCaptureLayout
 import org.gxvcam.ui.state.OpticalLens
+import org.gxvcam.ui.state.WatermarkStyle
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -46,7 +51,11 @@ object GXVImageProcessor {
         rotationDegrees: Int = 0,
         secondaryBitmap: Bitmap? = null,
         dualCaptureLayout: DualCaptureLayout = DualCaptureLayout.PIP,
-        isDualCaptureSwapped: Boolean = false
+        isDualCaptureSwapped: Boolean = false,
+        isPortraitMode: Boolean = false,
+        portraitAperture: Float = 2.8f,
+        watermarkStyle: WatermarkStyle = WatermarkStyle.OFF,
+        watermarkSignature: String = ""
     ): ByteArray {
         val startTime = System.currentTimeMillis()
         try {
@@ -100,6 +109,11 @@ object GXVImageProcessor {
                 applyVignette(canvas, width, height, vignette)
             }
 
+            // 5.3 Motorola Portrait Bokeh Blur (Aperture Simulation)
+            if (isPortraitMode) {
+                applyPortraitBokeh(processedBitmap, portraitAperture)
+            }
+
             // 5.5 Motorola Dual Capture PIP / 50:50 Split Compositing
             if (secondaryBitmap != null && !secondaryBitmap.isRecycled) {
                 if (dualCaptureLayout == DualCaptureLayout.SPLIT) {
@@ -107,6 +121,11 @@ object GXVImageProcessor {
                 } else {
                     compositePip(canvas, width, height, secondaryBitmap)
                 }
+            }
+
+            // 5.8 Motorola Edge 50 Neo & Pantone Film Frame Watermark
+            if (watermarkStyle != WatermarkStyle.OFF) {
+                applyWatermark(canvas, width, height, watermarkStyle, watermarkSignature, activeLens, exifTags)
             }
 
             // 6. Compress to JPEG with user-defined quality setting (default 85%, up to 100%)
@@ -437,6 +456,322 @@ object GXVImageProcessor {
             this.shader = shader
         }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+    }
+
+    private fun applyPortraitBokeh(bitmap: Bitmap, aperture: Float) {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= 0 || height <= 0) return
+
+        // Aperture factor: f/1.2 -> 1.0 (max bokeh), f/16 -> 0.0 (negligible)
+        val bokehStrength = ((16.0f - aperture.coerceIn(1.2f, 16.0f)) / (16.0f - 1.2f)).coerceIn(0f, 1f)
+        if (bokehStrength <= 0.05f) return
+
+        // 1. Downscale for fast, high-quality multi-pass box blur
+        val downsample = 4
+        val smallW = (width / downsample).coerceAtLeast(32)
+        val smallH = (height / downsample).coerceAtLeast(32)
+        val smallBitmap = Bitmap.createScaledBitmap(bitmap, smallW, smallH, true)
+
+        // Apply fast 2-pass box blur to simulate optical diffusion
+        val radius = (bokehStrength * 12).roundToInt().coerceIn(2, 16)
+        fastBoxBlur(smallBitmap, radius)
+
+        // 2. Upscale blurred bitmap with bilinear interpolation
+        val blurredBitmap = Bitmap.createScaledBitmap(smallBitmap, width, height, true)
+        if (smallBitmap != blurredBitmap) smallBitmap.recycle()
+
+        // 3. Composite blurred background onto original with human subject ellipse falloff
+        val canvas = Canvas(bitmap)
+        val cx = width * 0.5f
+        val cy = height * 0.42f // Classic portrait center-of-interest
+        val rx = width * 0.40f
+        val ry = height * 0.45f
+        val maxDist = hypot(rx, ry)
+
+        val maskShader = RadialGradient(
+            cx, cy, maxDist,
+            intArrayOf(
+                0x00FFFFFF,
+                0x00FFFFFF,
+                Color.argb((bokehStrength * 245).toInt(), 255, 255, 255)
+            ),
+            floatArrayOf(0.0f, 0.40f, 1.0f),
+            Shader.TileMode.CLAMP
+        )
+
+        val blurShader = BitmapShader(blurredBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        val composeShader = ComposeShader(blurShader, maskShader, PorterDuff.Mode.SRC_IN)
+        val blendPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            shader = composeShader
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), blendPaint)
+
+        blurredBitmap.recycle()
+    }
+
+    private fun fastBoxBlur(bitmap: Bitmap, radius: Int) {
+        val w = bitmap.width
+        val h = bitmap.height
+        val pix = IntArray(w * h)
+        bitmap.getPixels(pix, 0, w, 0, 0, w, h)
+
+        val wm = w - 1
+        val hm = h - 1
+        val wh = w * h
+        val div = radius + radius + 1
+
+        val r = IntArray(wh)
+        val g = IntArray(wh)
+        val b = IntArray(wh)
+        var rsum: Int
+        var gsum: Int
+        var bsum: Int
+        var p: Int
+        var yp: Int
+        var yi: Int
+        val vmin = IntArray(maxOf(w, h))
+
+        var yw = 0
+        yi = 0
+
+        for (curY in 0 until h) {
+            rsum = 0
+            gsum = 0
+            bsum = 0
+            for (curI in -radius..radius) {
+                p = pix[yi + curI.coerceIn(0, wm)]
+                rsum += (p and 0xFF0000) shr 16
+                gsum += (p and 0x00FF00) shr 8
+                bsum += p and 0x0000FF
+            }
+            for (curX in 0 until w) {
+                r[yi] = rsum / div
+                g[yi] = gsum / div
+                b[yi] = bsum / div
+
+                if (curY == 0) {
+                    vmin[curX] = (curX + radius + 1).coerceAtMost(wm)
+                }
+                val p1 = pix[yw + vmin[curX]]
+                val p2 = pix[yw + (curX - radius).coerceAtLeast(0)]
+
+                rsum += ((p1 and 0xFF0000) - (p2 and 0xFF0000)) shr 16
+                gsum += ((p1 and 0x00FF00) - (p2 and 0x00FF00)) shr 8
+                bsum += (p1 and 0x0000FF) - (p2 and 0x0000FF)
+                yi++
+            }
+            yw += w
+        }
+
+        for (curX in 0 until w) {
+            rsum = 0
+            gsum = 0
+            bsum = 0
+            yp = -radius * w
+            for (curI in -radius..radius) {
+                yi = curX + yp.coerceIn(0, (h - 1) * w)
+                rsum += r[yi]
+                gsum += g[yi]
+                bsum += b[yi]
+                yp += w
+            }
+            yi = curX
+            for (curY in 0 until h) {
+                pix[yi] = (-0x1000000) or
+                        ((rsum / div) shl 16) or
+                        ((gsum / div) shl 8) or
+                        (bsum / div)
+                if (curX == 0) {
+                    vmin[curY] = ((curY + radius + 1).coerceAtMost(hm)) * w
+                }
+                val p1 = curX + vmin[curY]
+                val p2 = curX + ((curY - radius).coerceAtLeast(0)) * w
+
+                rsum += r[p1] - r[p2]
+                gsum += g[p1] - g[p2]
+                bsum += b[p1] - b[p2]
+
+                yi += w
+            }
+        }
+        bitmap.setPixels(pix, 0, w, 0, 0, w, h)
+    }
+
+    private fun applyWatermark(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        style: WatermarkStyle,
+        signature: String,
+        activeLens: OpticalLens,
+        exifTags: Map<String, String>
+    ) {
+        when (style) {
+            WatermarkStyle.OFF -> return
+            WatermarkStyle.DEVICE -> applyDeviceStampWatermark(canvas, width, height, signature, activeLens)
+            WatermarkStyle.FILM_FRAME -> applyPantoneFilmFrameWatermark(canvas, width, height, signature, activeLens, exifTags)
+        }
+    }
+
+    private fun applyDeviceStampWatermark(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        signature: String,
+        activeLens: OpticalLens
+    ) {
+        val pad = width * 0.045f
+        val bottomY = height - pad
+        val leftX = pad
+
+        // Motorola Batwing circular badge
+        val iconRadius = width * 0.024f
+        val iconCenterY = bottomY - iconRadius
+        val iconCenterX = leftX + iconRadius
+
+        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = iconRadius * 0.16f
+            setShadowLayer(4f, 0f, 2f, Color.argb(160, 0, 0, 0))
+        }
+        canvas.drawCircle(iconCenterX, iconCenterY, iconRadius, circlePaint)
+
+        val mPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = iconRadius * 1.35f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(4f, 0f, 2f, Color.argb(160, 0, 0, 0))
+        }
+        canvas.drawText("M", iconCenterX, iconCenterY + iconRadius * 0.45f, mPaint)
+
+        // Text labels
+        val textStartX = iconCenterX + iconRadius * 1.6f
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = width * 0.023f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            setShadowLayer(6f, 0f, 2f, Color.argb(200, 0, 0, 0))
+        }
+        canvas.drawText("shot on motorola edge 50 neo", textStartX, iconCenterY - 4f, titlePaint)
+
+        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(220, 255, 255, 255)
+            textSize = width * 0.017f
+            typeface = Typeface.DEFAULT
+            setShadowLayer(5f, 0f, 2f, Color.argb(200, 0, 0, 0))
+        }
+        val subText = if (signature.isNotBlank()) signature else "Sony LYTIA 700C • Pantone Validated"
+        canvas.drawText(subText, textStartX, iconCenterY + width * 0.022f, subPaint)
+    }
+
+    private fun applyPantoneFilmFrameWatermark(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        signature: String,
+        activeLens: OpticalLens,
+        exifTags: Map<String, String>
+    ) {
+        val bannerHeight = (height * 0.055f).coerceAtLeast(80f)
+        val bannerRect = RectF(0f, height - bannerHeight, width.toFloat(), height.toFloat())
+
+        // Dark matte translucent film frame banner
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(230, 18, 20, 24)
+        }
+        canvas.drawRect(bannerRect, bgPaint)
+
+        // Subtle top divider
+        val linePaint = Paint().apply {
+            color = Color.argb(40, 255, 255, 255)
+            strokeWidth = 2f
+        }
+        canvas.drawLine(0f, height - bannerHeight, width.toFloat(), height - bannerHeight, linePaint)
+
+        val marginX = width * 0.035f
+        val centerY = height - bannerHeight / 2f
+
+        // 1. Left: Motorola M Circle + Model / Signature
+        val mCircleR = bannerHeight * 0.22f
+        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+        }
+        val mTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = mCircleR * 1.3f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawCircle(marginX + mCircleR, centerY, mCircleR, circlePaint)
+        canvas.drawText("M", marginX + mCircleR, centerY + mCircleR * 0.45f, mTextPaint)
+
+        val titleX = marginX + mCircleR * 2.5f
+        val modelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = bannerHeight * 0.26f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        canvas.drawText("motorola edge 50 neo", titleX, centerY - 3f, modelPaint)
+
+        val sigPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(180, 255, 255, 255)
+            textSize = bannerHeight * 0.20f
+            typeface = Typeface.DEFAULT
+        }
+        val subLabel = if (signature.isNotBlank()) signature else "Pantone Validated™ Camera"
+        canvas.drawText(subLabel, titleX, centerY + bannerHeight * 0.24f, sigPaint)
+
+        // 2. Center: Pantone Color Swatch (Poinciana #E24938)
+        val chipW = bannerHeight * 0.32f
+        val chipH = bannerHeight * 0.40f
+        val chipX = width * 0.50f
+        val chipY = centerY - chipH / 2f
+        val chipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E24938")
+        }
+        canvas.drawRoundRect(RectF(chipX, chipY, chipX + chipW, chipY + chipH), 6f, 6f, chipPaint)
+
+        val pantoneTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(220, 255, 255, 255)
+            textSize = bannerHeight * 0.19f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        canvas.drawText("PANTONE", chipX + chipW + 12f, centerY - 2f, pantoneTextPaint)
+
+        val poincianaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 255, 255, 255)
+            textSize = bannerHeight * 0.16f
+        }
+        canvas.drawText("Poinciana", chipX + chipW + 12f, centerY + bannerHeight * 0.20f, poincianaPaint)
+
+        // 3. Right: Shooting Parameters (Focal Length, Aperture, Shutter, ISO)
+        val focalMm = exifTags[ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM]?.let { "${it}mm" }
+            ?: when (activeLens) {
+                OpticalLens.UW -> "16mm"
+                OpticalLens.MAIN_1X -> "24mm"
+                OpticalLens.CROP_2X -> "48mm"
+                OpticalLens.TELE_3X -> "73mm"
+            }
+        val fNumber = exifTags[ExifInterface.TAG_F_NUMBER]?.let { "ƒ/$it" } ?: "ƒ/1.8"
+        val expTime = exifTags[ExifInterface.TAG_EXPOSURE_TIME]?.let { secStr ->
+            val sec = secStr.toDoubleOrNull()
+            if (sec != null && sec > 0) {
+                if (sec < 1.0) "1/${(1.0 / sec).roundToInt()}s" else "${sec}s"
+            } else secStr
+        } ?: "1/120s"
+        val iso = exifTags[ExifInterface.TAG_ISO_SPEED_RATINGS]?.let { "ISO $it" } ?: "ISO 100"
+
+        val paramsText = "$focalMm  $fNumber  $expTime  $iso"
+        val paramPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = bannerHeight * 0.22f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+            textAlign = Paint.Align.RIGHT
+        }
+        canvas.drawText(paramsText, width - marginX, centerY + bannerHeight * 0.08f, paramPaint)
     }
 
     private fun readExifAttributes(jpegBytes: ByteArray): Map<String, String> {

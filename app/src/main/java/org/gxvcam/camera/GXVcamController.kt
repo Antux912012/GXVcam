@@ -80,6 +80,7 @@ class GXVcamController(
         private set
     var currentCameraMode: CameraMode = CameraMode.PHOTO
         private set
+    var portraitAperture: Float = 2.8f
     private var supportedRequestKeyNames: Set<String> = emptySet()
 
     /** Last parameters used in [bindCamera], reused when a lens switch requires a sensor rebind. */
@@ -1129,6 +1130,7 @@ class GXVcamController(
 
                         // 2. Processed JPEG Capture (if format is JPEG or RAW_AND_JPEG)
                         if (format.isJpeg) {
+                            val isPortrait = lastBindConfig?.cameraMode == CameraMode.PORTRAIT || currentCameraMode == CameraMode.PORTRAIT
                             val processed = GXVImageProcessor.processJpeg(
                                 inputJpeg = bytes,
                                 profile = profile,
@@ -1140,7 +1142,11 @@ class GXVcamController(
                                 rotationDegrees = rotationDegrees,
                                 secondaryBitmap = secBitmap,
                                 dualCaptureLayout = currentVideoSettings.dualCaptureLayout,
-                                isDualCaptureSwapped = currentVideoSettings.isDualCaptureSwapped
+                                isDualCaptureSwapped = currentVideoSettings.isDualCaptureSwapped,
+                                isPortraitMode = isPortrait,
+                                portraitAperture = portraitAperture,
+                                watermarkStyle = currentManualSettings.watermarkStyle,
+                                watermarkSignature = currentManualSettings.watermarkSignature
                             )
 
                             val contentValues = ContentValues().apply {

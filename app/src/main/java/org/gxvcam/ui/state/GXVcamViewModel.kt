@@ -433,17 +433,64 @@ class GXVcamViewModel : ViewModel() {
                 val isVideo = _uiState.value.currentMode == CameraMode.VIDEO
                 controller?.applyProSettings(auto, isVideoMode = isVideo)
             }
+
+            // Motorola Flagship Features
+            is GXVcamEvent.SelectPortraitLens -> {
+                val pLens = event.lens
+                _uiState.update { it.copy(activePortraitLens = pLens) }
+                handleZoomChanged(pLens.zoomRatio)
+            }
+
+            is GXVcamEvent.SetPortraitAperture -> {
+                _uiState.update { it.copy(portraitAperture = event.aperture) }
+                controller?.portraitAperture = event.aperture
+            }
+
+            is GXVcamEvent.SetPortraitApertureExpanded -> {
+                _uiState.update { it.copy(isPortraitApertureExpanded = event.expanded) }
+            }
+
+            is GXVcamEvent.ToggleMacroLock -> {
+                val newLock = !_uiState.value.isMacroLocked
+                _uiState.update { it.copy(isMacroLocked = newLock) }
+                if (newLock) {
+                    handleZoomChanged(OpticalLens.UW.zoomRatio)
+                } else {
+                    handleZoomChanged(1.0f)
+                }
+            }
+
+            is GXVcamEvent.ToggleAutoNightVision -> {
+                _uiState.update { it.copy(isAutoNightVisionActive = !it.isAutoNightVisionActive) }
+            }
+
+            is GXVcamEvent.SetWatermarkStyle -> {
+                val updated = _uiState.value.manualSettings.copy(
+                    watermarkStyle = event.style,
+                    isWatermarkEnabled = event.style != WatermarkStyle.OFF
+                )
+                _uiState.update { it.copy(watermarkStyle = event.style, manualSettings = updated) }
+                controller?.applyManualSettings(updated)
+            }
+
+            is GXVcamEvent.SetWatermarkSignature -> {
+                val updated = _uiState.value.manualSettings.copy(watermarkSignature = event.signature)
+                _uiState.update { it.copy(watermarkCustomSignature = event.signature, manualSettings = updated) }
+                controller?.applyManualSettings(updated)
+            }
         }
     }
 
     private fun handleModeSelected(mode: CameraMode) {
         val previousMode = _uiState.value.currentMode
         if (mode == CameraMode.PORTRAIT) {
+            val pLens = _uiState.value.activePortraitLens
+            val optLens = OpticalLens.forZoom(pLens.zoomRatio)
             _uiState.update {
                 it.copy(
                     currentMode = mode,
-                    activeLens = OpticalLens.TELE_3X,
-                    currentZoomRatio = OpticalLens.TELE_3X.zoomRatio,
+                    activeLens = optLens,
+                    currentZoomRatio = pLens.zoomRatio,
                     isProPanelExpanded = false
                 )
             }

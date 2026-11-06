@@ -106,6 +106,24 @@ enum class DualCaptureLayout(val label: String) {
     SPLIT("Split 50:50")
 }
 
+enum class MotoPortraitLens(
+    val focalMm: Int,
+    val zoomRatio: Float,
+    val label: String,
+    val subLabel: String
+) {
+    WIDE_24MM(24, 1.0f, "24mm", "Wide"),
+    STANDARD_35MM(35, 1.5f, "35mm", "Standard"),
+    FULL_VIEW_50MM(50, 2.0f, "50mm", "Full View"),
+    CLOSE_UP_85MM(85, 3.5f, "85mm", "Close-Up")
+}
+
+enum class WatermarkStyle(val label: String) {
+    OFF("Off"),
+    DEVICE("Device Stamp (Motorola)"),
+    FILM_FRAME("Pantone Film Frame")
+}
+
 @Immutable
 data class MotoVideoSettings(
     val resolution: VideoResolution = VideoResolution.FHD_1080P,
@@ -346,6 +364,10 @@ data class CameraManualSettings(
     val jpegQuality: Int = 85,
     val hdrFrameCount: Int = 8,
     val isWatermarkEnabled: Boolean = false,
+    val watermarkStyle: WatermarkStyle = WatermarkStyle.OFF,
+    val watermarkSignature: String = "",
+    val isAutoMacroEnabled: Boolean = true,
+    val isAutoNightVisionEnabled: Boolean = true,
     val isHistogramOverlayVisible: Boolean = true,
     val isHorizonLevelVisible: Boolean = true,
     val gridType: GridType = GridType.RULE_OF_THIRDS,
@@ -424,7 +446,16 @@ data class GXVcamUiState(
     val sonyAfMode: SonyAfMode = SonyAfMode.AF_C,
     val sonyAeMode: SonyAeMode = SonyAeMode.AE_AUTO,
     val tapFocusEvOffset: Float = 0f,
-    val isZoomSliderExpanded: Boolean = false
+    val isZoomSliderExpanded: Boolean = false,
+    val activePortraitLens: MotoPortraitLens = MotoPortraitLens.STANDARD_35MM,
+    val portraitAperture: Float = 2.8f,
+    val isPortraitApertureExpanded: Boolean = false,
+    val isAutoMacroEnabled: Boolean = true,
+    val isMacroLocked: Boolean = false,
+    val isAutoNightVisionEnabled: Boolean = true,
+    val isAutoNightVisionActive: Boolean = false,
+    val watermarkStyle: WatermarkStyle = WatermarkStyle.OFF,
+    val watermarkCustomSignature: String = ""
 ) {
     val isAeAfLocked: Boolean get() = isAeLocked && isAfLocked
 }
@@ -491,4 +522,13 @@ sealed interface GXVcamEvent {
     data object ToggleDualCaptureSwap : GXVcamEvent
     data class ToggleLiveViewfinderLut(val enabled: Boolean) : GXVcamEvent
     data object ResetAgcToDefaults : GXVcamEvent
+
+    // Motorola Flagship Features
+    data class SelectPortraitLens(val lens: MotoPortraitLens) : GXVcamEvent
+    data class SetPortraitAperture(val aperture: Float) : GXVcamEvent
+    data class SetPortraitApertureExpanded(val expanded: Boolean) : GXVcamEvent
+    data object ToggleMacroLock : GXVcamEvent
+    data object ToggleAutoNightVision : GXVcamEvent
+    data class SetWatermarkStyle(val style: WatermarkStyle) : GXVcamEvent
+    data class SetWatermarkSignature(val signature: String) : GXVcamEvent
 }

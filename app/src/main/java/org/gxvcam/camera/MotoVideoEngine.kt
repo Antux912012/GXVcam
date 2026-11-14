@@ -7,8 +7,52 @@ import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import org.gxvcam.ui.state.MotoVideoSettings
 import org.gxvcam.ui.state.MotoVideoStabilization
+import org.gxvcam.ui.state.VideoResolution
+import org.gxvcam.video.SeamlessLensZoomController
 
 object MotoVideoEngine {
+
+    fun computeTargetFps(settings: MotoVideoSettings): Int {
+        val maxFps = when {
+            settings.isDualCaptureEnabled -> 30
+            settings.resolution == VideoResolution.UHD_4K -> 30
+            settings.resolution == VideoResolution.FHD_1080P -> 60
+            else -> settings.frameRate.fps
+        }
+        return minOf(settings.frameRate.fps, maxFps)
+    }
+
+    fun compute180ShutterTargetNs(settings: MotoVideoSettings): Long {
+        return SeamlessLensZoomController.compute180ShutterExposureNs(computeTargetFps(settings))
+    }
+
+    fun computeEquivalentIso(
+        meteredExposureNs: Long,
+        meteredIso: Int,
+        targetExposureNs: Long,
+        isoRange: IntRange = 50..6400
+    ): Int {
+        if (meteredExposureNs <= 0L || targetExposureNs <= 0L) {
+            return meteredIso.coerceIn(isoRange.first, isoRange.last)
+        }
+        val evProduct = meteredExposureNs.toDouble() * meteredIso.coerceAtLeast(1).toDouble()
+        val computed = (evProduct / targetExposureNs.toDouble()).toInt()
+        return computed.coerceIn(isoRange.first, isoRange.last)
+    }
+
+    fun computeTargetBitRate(settings: MotoVideoSettings): Int {
+        val effectiveRes = if (settings.isDualCaptureEnabled && settings.resolution == VideoResolution.UHD_4K) {
+            VideoResolution.FHD_1080P
+        } else {
+            settings.resolution
+        }
+        val targetFps = computeTargetFps(settings)
+        return when (effectiveRes) {
+            VideoResolution.UHD_4K -> 65_000_000
+            VideoResolution.FHD_1080P -> if (targetFps >= 60) 35_000_000 else 24_000_000
+            VideoResolution.HD_720P -> if (targetFps >= 60) 18_000_000 else 12_000_000
+        }
+    }
 
     @OptIn(ExperimentalCamera2Interop::class)
     fun applyVideoInterop(
@@ -17,34 +61,37 @@ object MotoVideoEngine {
         zoomRatio: Float = 1.0f,
         rollDegrees: Float = 0f,
         supportedKeyNames: Set<String> = emptySet(),
-        hasOis: Boolean = true
+        hasOis: Boolean = true,
+        manualIsoFor180Shutter: Int? = null
     ) {
-        // 1. Target AE FPS range (e.g. 30..30, 60..60, or 120..120)
-        // MediaTek Dimensity 7300 supports up to 30fps for 4K UHD and dual concurrent capture
-        val maxFps = if (settings.isDualCaptureEnabled || settings.resolution == org.gxvcam.ui.state.VideoResolution.UHD_4K) 30 else settings.frameRate.fps
-        val targetFps = minOf(settings.frameRate.fps, maxFps)
-        builder.setCaptureRequestOption(
-            CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+        // 1. Hardware-friendly AE FPS range (Night Video drops floor to 24fps for brighter frames)
+        val targetFps = computeTargetFps(settings)
+        val fpsRange = if (settings.isNightVisionVideoEnabled && targetFps <= 30) {
+            Range(24, 30)
+        } else {
             Range(targetFps, targetFps)
+        }
+        builder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRange)
+
+        // Optional 180-degree cinema shutter lock when an explicit manual ISO is supplied
+        if (settings.isShutter180Locked && manualIsoFor180Shutter != null) {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+            builder.setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, compute180ShutterTargetNs(settings))
+            builder.setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, manualIsoFor180Shutter)
+        }
+
+        // 2. Standard Camera2 Video Quality Pipeline
+        // NOTE: Do NOT inject raw MTK/Moto PIP or EIS vendor tags (MTK_PIP_DEVICES, MTK_EIS_MODE,
+        // MTK_PREVIEW_EIS, MOTO_VSTAB_*, MTK_HFPS_MODE, MTK_VIDEO_AINR_MODES) here: on MT6878
+        // camerahalserver, setting those without Motorola's proprietary HAL session triggers
+        // PIPCameraGPUControl errors and outputs all-zero YUV buffers (solid green viewfinder).
+        builder.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_HIGH_QUALITY)
+        builder.setCaptureRequestOption(
+            CaptureRequest.NOISE_REDUCTION_MODE,
+            CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY
         )
 
-        // 2. Motorola Video Night Vision (low-light boost for Dimensity ISP)
-        val nvValue = if (settings.isNightVisionVideoEnabled) 1 else 0
-        setIfSupported(builder, MtkMotoVendorTags.MOTO_VIDEO_NV, nvValue, supportedKeyNames)
-
-        // 3. Motorola HDR10+ / 10-bit HLG Video Mode Tuning
-        val hdrValue = if (settings.isHdr10BitEnabled) 1 else 0
-        setIfSupported(builder, MtkMotoVendorTags.MOTO_HDR10_TUNING, hdrValue, supportedKeyNames)
-        setIfSupported(builder, MtkMotoVendorTags.MOTO_3D_HDR_MODE, hdrValue, supportedKeyNames)
-        setIfSupported(builder, MtkMotoVendorTags.MOTO_VHDR_STATE, hdrValue, supportedKeyNames)
-
-        // 4. Motorola Edge 50 Neo Dual Capture / PIP Tag
-        val dualVal = if (settings.isDualCaptureEnabled) 1 else 0
-        setIfSupported(builder, MtkMotoVendorTags.MOTO_IS_DUAL_CAPTURE, dualVal, supportedKeyNames)
-        setIfSupported(builder, MtkMotoVendorTags.MTK_PIP_DEVICES, dualVal, supportedKeyNames)
-
-        // 5. Motorola Edge 50 Neo Stabilization Pipeline (OIS + Smart EIS + 360° Horizon Lock)
-        // Ultra-wide (GC13A2) lacks physical OIS; disable OIS when unsupported or stabilization is OFF
+        // 3. Standard Android Camera2 OIS & Video Stabilization
         val effectiveOis = if (hasOis && settings.stabilization != MotoVideoStabilization.OFF) {
             CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
         } else {
@@ -52,48 +99,11 @@ object MotoVideoEngine {
         }
         builder.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, effectiveOis)
 
-        when (settings.stabilization) {
-            MotoVideoStabilization.OFF -> {
-                builder.setCaptureRequestOption(
-                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
-                )
-                setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_SMARTEIS, 0, supportedKeyNames)
-                setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_IHC, 0, supportedKeyNames)
-            }
-            MotoVideoStabilization.ADAPTIVE -> {
-                builder.setCaptureRequestOption(
-                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
-                )
-                setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_SMARTEIS, 1, supportedKeyNames)
-                setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_IHC, 0, supportedKeyNames)
-            }
-            MotoVideoStabilization.HORIZON_LOCK -> {
-                builder.setCaptureRequestOption(
-                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
-                )
-                // IHC = In-Hardware Horizon Correction (360° horizon lock)
-                setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_SMARTEIS, 1, supportedKeyNames)
-                setIfSupported(builder, MtkMotoVendorTags.MOTO_VSTAB_IHC, 1, supportedKeyNames)
-            }
+        val videoStabMode = if (settings.stabilization != MotoVideoStabilization.OFF) {
+            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON
+        } else {
+            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
         }
-    }
-
-    @OptIn(ExperimentalCamera2Interop::class)
-    private fun <T : Any> setIfSupported(
-        builder: CaptureRequestOptions.Builder,
-        key: CaptureRequest.Key<T>?,
-        value: T,
-        supportedKeyNames: Set<String>
-    ) {
-        if (key != null && (supportedKeyNames.isEmpty() || supportedKeyNames.contains(key.name))) {
-            try {
-                builder.setCaptureRequestOption(key, value)
-            } catch (_: IllegalArgumentException) {
-                // Key not supported on the active camera sensor HAL
-            }
-        }
+        builder.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, videoStabMode)
     }
 }

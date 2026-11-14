@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,7 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VerticalSplit
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.LocalFlorist
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -99,20 +103,26 @@ fun GXVcamScreenContent(
         }
     }
 
+    CompositionLocalProvider(
+        LocalZoomScrollHapticsEnabled provides uiState.manualSettings.isZoomScrollHapticsEnabled
+    ) {
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(OledBlack)
     ) {
-        // Center: Adaptive Viewfinder Container (spans 100% of the screen in FULL mode)
+        // Center: Adaptive Viewfinder Container (Horizon Leveler reserved for PRO mode)
         GXVViewfinderContainer(
             aspectRatio = uiState.aspectRatio,
             gridEnabled = uiState.gridEnabled,
             gridType = uiState.manualSettings.gridType,
-            showHorizon = uiState.manualSettings.isHorizonLevelVisible,
+            showHorizon = (uiState.currentMode == CameraMode.PRO) && uiState.manualSettings.isHorizonLevelVisible,
             levelHorizonDegrees = uiState.levelHorizonDegrees,
+            deviceCardinalAngle = uiState.deviceCardinalAngle,
+            isHorizonPlanar = uiState.isHorizonPlanar,
             currentZoom = uiState.currentZoomRatio,
             isBackCamera = uiState.isBackCamera,
+            showSplitAeAfLocks = (uiState.currentMode == CameraMode.PRO),
             isAeLocked = uiState.isAeLocked,
             isAfLocked = uiState.isAfLocked,
             isAeAfLocked = uiState.isAeAfLocked,
@@ -120,17 +130,6 @@ fun GXVcamScreenContent(
             modifier = Modifier.fillMaxSize(),
             content = effectiveViewfinderContent
         )
-
-        // Motorola Dual Capture Floating PIP Window (Draggable, Rounded Corner, Instant Swap)
-        if (isDualCaptureActive && uiState.motoVideoSettings.dualCaptureLayout == DualCaptureLayout.PIP) {
-            DualCapturePipWindow(
-                onSwap = { onEvent(GXVcamEvent.ToggleDualCaptureSwap) },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 110.dp, end = 16.dp),
-                content = secondaryViewfinderContent
-            )
-        }
 
         // Top Overlay: Live RGB Histogram in Pro Mode or when enabled in settings
         AnimatedVisibility(
@@ -146,6 +145,8 @@ fun GXVcamScreenContent(
                 isFull = isFull,
             )
         }
+
+        val isFocusSupported = uiState.isBackCamera && uiState.hardwareCapabilities.minFocusDistanceDiopters > 0f
 
         // Top Column: Quick Settings Bar and Moto Video Bar
         Column(
@@ -176,7 +177,9 @@ fun GXVcamScreenContent(
                 onOpenSettings = { onEvent(GXVcamEvent.ToggleSettingsSheet) },
                 onOpenLibPatcher = { onEvent(GXVcamEvent.ToggleAgcSheet) },
                 isProMode = uiState.currentMode == CameraMode.PRO,
+                isVideoMode = uiState.currentMode == CameraMode.VIDEO,
                 isRawSupported = uiState.hardwareCapabilities.isRawSupported,
+                isFocusSupported = isFocusSupported,
                 captureFormat = uiState.manualSettings.captureFormat,
                 onCycleCaptureFormat = { onEvent(GXVcamEvent.CycleCaptureFormat) },
                 isDualCaptureEnabled = uiState.motoVideoSettings.isDualCaptureEnabled,
@@ -257,11 +260,12 @@ fun GXVcamScreenContent(
                 }
             }
 
-            // Motorola Contextual Badges: Macro lock & Night Vision in PHOTO Mode
-            val showMacroPill = uiState.manualSettings.isAutoMacroEnabled
-            val showNightPill = uiState.manualSettings.isAutoNightVisionEnabled
+            // Motorola Contextual Badges: Macro & Night Vision in Photo
+            val showMacroPill = uiState.isBackCamera && uiState.currentMode == CameraMode.PHOTO && uiState.manualSettings.isAutoMacroEnabled
+            val showNightPill = uiState.isBackCamera && uiState.currentMode == CameraMode.PHOTO && uiState.manualSettings.isAutoNightVisionEnabled
+
             AnimatedVisibility(
-                visible = uiState.currentMode == CameraMode.PHOTO && (showMacroPill || showNightPill),
+                visible = showMacroPill || showNightPill,
                 enter = fadeIn(GXVMotion.fastEffects()),
                 exit = fadeOut(GXVMotion.fastEffects())
             ) {
@@ -269,27 +273,29 @@ fun GXVcamScreenContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 14.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Macro Pill
+                    // Macro Pill (Material Icon)
                     if (showMacroPill) Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.primaryContainer else Color(0x66000000),
                         border = BorderStroke(1.dp, if (uiState.isMacroLocked) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.20f)),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
+                            .heightIn(min = 36.dp)
+                            .clip(RoundedCornerShape(20.dp))
                             .clickable { onEvent(GXVcamEvent.ToggleMacroLock) }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            Text(
-                                text = "✿",
-                                fontSize = 12.sp,
-                                color = if (uiState.isMacroLocked) MaterialTheme.colorScheme.primary else Color.White
+                            Icon(
+                                imageVector = Icons.Rounded.LocalFlorist,
+                                contentDescription = "Macro",
+                                tint = if (uiState.isMacroLocked) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = if (uiState.isMacroLocked) "Macro ON" else "Macro",
@@ -300,23 +306,27 @@ fun GXVcamScreenContent(
                         }
                     }
 
-                    if (showMacroPill && showNightPill) Spacer(modifier = Modifier.width(8.dp))
-
-                    // Night Vision Pill (rebinds PHOTO with the OEM Night extension)
+                    // Night Vision Pill (Material Icon, rebinds PHOTO with OEM Night extension)
                     if (showNightPill) Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = if (uiState.isAutoNightVisionActive) Color(0xCCFFB74D) else Color(0x66000000),
                         border = BorderStroke(1.dp, if (uiState.isAutoNightVisionActive) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.20f)),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
+                            .heightIn(min = 36.dp)
+                            .clip(RoundedCornerShape(20.dp))
                             .clickable { onEvent(GXVcamEvent.ToggleAutoNightVision) }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            Text(text = "🌙", fontSize = 11.sp)
+                            Icon(
+                                imageVector = Icons.Rounded.DarkMode,
+                                contentDescription = "Night Vision",
+                                tint = if (uiState.isAutoNightVisionActive) Color.Black else Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
                             Text(
                                 text = if (uiState.isAutoNightVisionActive) "Night ON" else "Night",
                                 fontSize = 11.sp,
@@ -340,6 +350,25 @@ fun GXVcamScreenContent(
                 )
             }
 
+            // Sprint 8: Pro Video Cinema Telemetry, Codec/3D-LUT Drawer, 180° Shutter & Live Stereo VU Meter
+            // Shown when Cinema Pro engine is active in Video mode
+            AnimatedVisibility(
+                visible = uiState.currentMode == CameraMode.VIDEO && uiState.motoVideoSettings.isProVideoEngineEnabled,
+                enter = fadeIn(GXVMotion.fastEffects()),
+                exit = fadeOut(GXVMotion.fastEffects())
+            ) {
+                ProVideoCinemaTopTelemetry(
+                    videoSettings = uiState.motoVideoSettings,
+                    codecCapabilities = uiState.videoCodecCapabilities,
+                    audioMeterDbFs = uiState.audioMeterDbFs,
+                    availableAudioDevices = uiState.availableAudioDevices,
+                    seamlessColorState = uiState.seamlessColorState,
+                    isRecording = uiState.isRecording,
+                    recordingDurationMs = uiState.recordingDurationMs,
+                    onUpdateVideoSettings = { onEvent(GXVcamEvent.UpdateMotoVideoSettings(it)) }
+                )
+            }
+
             // Pro Manual Top Bar (when TOP_BAR layout is selected)
             if (uiState.manualSettings.proLayoutPosition == org.gxvcam.ui.state.ProLayoutPosition.TOP_BAR) {
                 ProManualDeck(
@@ -350,6 +379,7 @@ fun GXVcamScreenContent(
                     onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                     onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                     layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.TOP_BAR,
+                    isFocusSupported = isFocusSupported,
                     isFull = isFull,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -368,6 +398,7 @@ fun GXVcamScreenContent(
                 onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                 onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                 layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_RIGHT,
+                isFocusSupported = isFocusSupported,
                 isFull = isFull,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -385,10 +416,28 @@ fun GXVcamScreenContent(
                 onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                 onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                 layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.SIDEBAR_LEFT,
+                isFocusSupported = isFocusSupported,
                 isFull = isFull,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 10.dp),
+            )
+        }
+
+        // Motorola Dual Capture Floating PIP Window (Draggable, Rounded Corner, Instant Swap)
+        if (isDualCaptureActive && uiState.motoVideoSettings.dualCaptureLayout == DualCaptureLayout.PIP) {
+            val pipTopPadding = when {
+                uiState.currentMode == CameraMode.VIDEO && uiState.motoVideoSettings.isProVideoEngineEnabled -> 228.dp
+                uiState.currentMode == CameraMode.VIDEO -> 180.dp
+                else -> 148.dp
+            }
+            DualCapturePipWindow(
+                onSwap = { onEvent(GXVcamEvent.ToggleDualCaptureSwap) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = pipTopPadding, end = 16.dp),
+                content = secondaryViewfinderContent
             )
         }
 
@@ -412,6 +461,7 @@ fun GXVcamScreenContent(
                     onControlSelected = { onEvent(GXVcamEvent.OnActiveProControlSelected(it)) },
                     onProSettingChanged = { onEvent(GXVcamEvent.OnProSettingChanged(it)) },
                     layoutPosition = org.gxvcam.ui.state.ProLayoutPosition.BOTTOM_DOCK,
+                    isFocusSupported = isFocusSupported,
                     isFull = isFull,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -419,7 +469,7 @@ fun GXVcamScreenContent(
 
 
 
-            // M3 Expressive Lens Pill Selector or Motorola 4-Prime Portrait Deck
+            // M3 Expressive Lens Pill Selector, Video Zoom Rocker, or Motorola 4-Prime Portrait Deck
             if (uiState.currentMode == CameraMode.PORTRAIT && uiState.isBackCamera) {
                 MotoPortraitDeck(
                     activeLens = uiState.activePortraitLens,
@@ -429,6 +479,19 @@ fun GXVcamScreenContent(
                     onApertureChanged = { onEvent(GXVcamEvent.SetPortraitAperture(it)) },
                     onToggleApertureExpanded = { onEvent(GXVcamEvent.SetPortraitApertureExpanded(it)) },
                     isFull = isFull
+                )
+            } else if (uiState.currentMode == CameraMode.VIDEO) {
+                ProVideoZoomRockerDeck(
+                    currentZoomRatio = uiState.currentZoomRatio,
+                    isBackCamera = uiState.isBackCamera,
+                    onZoomChanged = { onEvent(GXVcamEvent.OnZoomChanged(it)) },
+                    onZoomDetentSelected = { zoom ->
+                        if (zoom == 0.6f || zoom == 1.0f || zoom == 2.0f || zoom == 3.0f) {
+                            onEvent(GXVcamEvent.OnLensSelected(org.gxvcam.ui.state.OpticalLens.forZoom(zoom)))
+                        } else {
+                            onEvent(GXVcamEvent.SetZoomRatio(zoom))
+                        }
+                    }
                 )
             } else {
                 ExpressiveLensSelector(
@@ -440,7 +503,9 @@ fun GXVcamScreenContent(
                     isExpanded = uiState.isZoomSliderExpanded,
                     onExpandedChange = { onEvent(GXVcamEvent.SetZoomSliderExpanded(it)) },
                     isFull = isFull,
-                    isBackCamera = uiState.isBackCamera
+                    isBackCamera = uiState.isBackCamera,
+                    isProMode = (uiState.currentMode == CameraMode.PRO),
+                    isRotaryDialEnabled = uiState.manualSettings.isRotaryZoomDialEnabled
                 )
             }
 
@@ -482,9 +547,45 @@ fun GXVcamScreenContent(
             CameraSettingsBottomSheet(
                 settings = uiState.manualSettings,
                 onUpdateSettings = { onEvent(GXVcamEvent.UpdateManualSettings(it)) },
-                onDismiss = { onEvent(GXVcamEvent.ToggleSettingsSheet) }
+                onDismiss = { onEvent(GXVcamEvent.ToggleSettingsSheet) },
+                pipelineMetrics = uiState.pipelineMetrics,
+                onOpenAiSettings = {
+                    onEvent(GXVcamEvent.ToggleSettingsSheet)
+                    onEvent(GXVcamEvent.ToggleAiSettingsSheet)
+                }
             )
         }
+
+        // Dual-Path AI Engine Settings Sheet
+        if (uiState.isAiSheetOpen) {
+            GxvAiSettingsSheet(
+                settings = uiState.manualSettings,
+                telemetry = uiState.npuTelemetry,
+                onBackendSelected = { backend ->
+                    onEvent(
+                        GXVcamEvent.UpdateManualSettings(
+                            uiState.manualSettings.copy(aiBackend = backend)
+                        )
+                    )
+                },
+                onNpuProfileSelected = { profile ->
+                    onEvent(
+                        GXVcamEvent.UpdateManualSettings(
+                            uiState.manualSettings.copy(npuPowerProfile = profile)
+                        )
+                    )
+                },
+                onToggleInternalNpuOnly = { strict ->
+                    onEvent(
+                        GXVcamEvent.UpdateManualSettings(
+                            uiState.manualSettings.copy(useInternalNpuOnly = strict)
+                        )
+                    )
+                },
+                onDismiss = { onEvent(GXVcamEvent.ToggleAiSettingsSheet) }
+            )
+        }
+    }
     }
 }
 
@@ -521,7 +622,7 @@ fun DualCapturePipWindow(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(6.dp)
-                .size(32.dp)
+                .size(36.dp)
                 .clip(CircleShape)
                 .background(Color(0xAA000000))
                 .clickable {
@@ -530,11 +631,11 @@ fun DualCapturePipWindow(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "⇄",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+            Icon(
+                imageVector = Icons.Default.SwapHoriz,
+                contentDescription = "Swap Cameras",
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
@@ -591,11 +692,11 @@ fun DualCaptureSplitView(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = "⇄",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = "Swap",

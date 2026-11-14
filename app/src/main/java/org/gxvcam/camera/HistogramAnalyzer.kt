@@ -25,9 +25,20 @@ class HistogramAnalyzer(
     private val yNorm = FloatArray(256)
 
     override fun analyze(image: ImageProxy) {
+        try {
+            analyzeWithoutClosing(image)
+        } finally {
+            image.close()
+        }
+    }
+
+    /**
+     * Computes the RGB + Luma histogram without closing [image], allowing a shared
+     * [ImageAnalysis.Analyzer] to run additional passes (e.g. vEVS) on the same frame.
+     */
+    fun analyzeWithoutClosing(image: ImageProxy) {
         val now = System.nanoTime()
         if (now - lastUpdateNs < frameIntervalNs) {
-            image.close()
             return
         }
         lastUpdateNs = now
@@ -97,8 +108,6 @@ class HistogramAnalyzer(
             onHistogramComputed(HistogramData(rNorm.clone(), gNorm.clone(), bNorm.clone(), yNorm.clone()))
         } catch (_: Exception) {
             // Ignore frame decode exceptions on closed image
-        } finally {
-            image.close()
         }
     }
 }

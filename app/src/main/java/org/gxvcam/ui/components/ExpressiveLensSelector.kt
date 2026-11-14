@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -106,6 +107,8 @@ fun ExpressiveLensSelector(
     onExpandedChange: (Boolean) -> Unit = {},
     isFull: Boolean = false,
     isBackCamera: Boolean = true,
+    isProMode: Boolean = false,
+    isRotaryDialEnabled: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val tactile = rememberTactileFeedback()
@@ -179,186 +182,201 @@ fun ExpressiveLensSelector(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Intermediate Quick Jump Chips (0.6x, 1.0x, 1.2x, 1.5x, 2.0x, 3.0x, 5.0x, 10x, 20x)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        QUICK_CHIPS.forEach { chipZoom ->
-                            val isChipActive = abs(currentZoomRatio - chipZoom) < 0.05f
-                            val label = when {
-                                chipZoom == 0.6f -> ".6"
-                                chipZoom == chipZoom.toInt().toFloat() -> "${chipZoom.toInt()}x"
-                                else -> "${chipZoom}x"
+                    if (isRotaryDialEnabled) {
+                        RotateToZoomDial(
+                            currentZoomRatio = currentZoomRatio,
+                            isBackCamera = isBackCamera,
+                            onZoomChanged = { z ->
+                                lastInteractionTime = System.currentTimeMillis()
+                                onZoomChanged(z)
+                            },
+                            onZoomDetentSelected = { z ->
+                                lastInteractionTime = System.currentTimeMillis()
+                                onZoomStep(z)
                             }
+                        )
+                    } else {
+                        // Intermediate Quick Jump Chips (0.6x, 1.0x, 1.2x, 1.5x, 2.0x, 3.0x, 5.0x, 10x, 20x)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            QUICK_CHIPS.forEach { chipZoom ->
+                                val isChipActive = abs(currentZoomRatio - chipZoom) < 0.05f
+                                val label = when {
+                                    chipZoom == 0.6f -> ".6"
+                                    chipZoom == chipZoom.toInt().toFloat() -> "${chipZoom.toInt()}x"
+                                    else -> "${chipZoom}x"
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isChipActive) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = 0.08f)
+                                        )
+                                        .clickable {
+                                            tactile.triggerScrollSnap()
+                                            lastInteractionTime = System.currentTimeMillis()
+                                            onZoomStep(chipZoom)
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isChipActive) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isChipActive) MaterialTheme.colorScheme.onPrimaryContainer else Color.White.copy(alpha = 0.85f)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Precision Drag Ruler with Minus & Plus Micro-Steppers
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Minus 0.1x Micro-step button
                             Box(
                                 modifier = Modifier
+                                    .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(
-                                        if (isChipActive) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = 0.08f)
-                                    )
+                                    .background(Color.White.copy(alpha = 0.08f))
                                     .clickable {
-                                        tactile.triggerSnap()
+                                        tactile.triggerScrollTick()
                                         lastInteractionTime = System.currentTimeMillis()
-                                        onZoomStep(chipZoom)
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                        val next = ((currentZoomRatio - 0.1f) * 10f).roundToInt() / 10f
+                                        onZoomStep(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isChipActive) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isChipActive) MaterialTheme.colorScheme.onPrimaryContainer else Color.White.copy(alpha = 0.85f)
-                                )
+                                Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
-                        }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Precision Drag Ruler with Minus & Plus Micro-Steppers
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Minus 0.1x Micro-step button
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .clickable {
-                                    tactile.triggerTick()
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    val next = ((currentZoomRatio - 0.1f) * 10f).roundToInt() / 10f
-                                    onZoomStep(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-
-                        // Center Continuous Draggable Canvas Ruler
-                        val density = LocalDensity.current.density
-                        val primaryArgb = primaryColor.toArgb()
-                        val textPaint = remember(density) {
-                            Paint().apply {
-                                color = android.graphics.Color.WHITE
-                                textSize = 9f * density
-                                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                                textAlign = Paint.Align.CENTER
-                                isAntiAlias = true
-                            }
-                        }
-
-                        Canvas(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .padding(horizontal = 4.dp)
-                                .pointerInput(Unit) {
-                                    detectDragGestures(
-                                        onDragStart = {
-                                            lastInteractionTime = System.currentTimeMillis()
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            lastInteractionTime = System.currentTimeMillis()
-                                            val deltaDp = -dragAmount.x / density
-                                            val currentX = zoomToRulerX(currentZoomRatio)
-                                            val newX = (currentX + deltaDp).coerceIn(0f, TOTAL_RULER_WIDTH_DP)
-                                            val newZoom = rulerXToZoom(newX)
-                                            val step = (newZoom * 10f).roundToInt()
-                                            if (step != lastHapticStep) {
-                                                val roundedZoom = step / 10f
-                                                if (MAJOR_STOPS.any { abs(it - roundedZoom) < 0.05f }) {
-                                                    tactile.triggerSnap()
-                                                } else {
-                                                    tactile.triggerTick()
-                                                }
-                                                lastHapticStep = step
-                                            }
-                                            onZoomChanged((newZoom * 10f).roundToInt() / 10f)
-                                        },
-                                        onDragEnd = {
-                                            lastInteractionTime = System.currentTimeMillis()
-                                        }
-                                    )
+                            // Center Continuous Draggable Canvas Ruler
+                            val density = LocalDensity.current.density
+                            val primaryArgb = primaryColor.toArgb()
+                            val textPaint = remember(density) {
+                                Paint().apply {
+                                    color = android.graphics.Color.WHITE
+                                    textSize = 9f * density
+                                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                                    textAlign = Paint.Align.CENTER
+                                    isAntiAlias = true
                                 }
-                        ) {
-                            val centerX = size.width / 2f
-                            val currentRulerX = zoomToRulerX(currentZoomRatio)
+                            }
 
-                            // Draw ruler tick marks
-                            for (tick in RULER_TICKS) {
-                                val tickScreenX = centerX + (zoomToRulerX(tick) - currentRulerX) * density
-                                if (tickScreenX in -40f..(size.width + 40f)) {
-                                    val isMajor = MAJOR_STOPS.any { abs(it - tick) < 0.05f }
-                                    val isHalf = ((tick * 10f).roundToInt() % 5 == 0)
-
-                                    if (isMajor) {
-                                        val isCurrentStop = abs(tick - currentZoomRatio) < 0.05f
-                                        drawLine(
-                                            color = if (isCurrentStop) primaryColor else Color.White.copy(alpha = 0.9f),
-                                            start = Offset(tickScreenX, 4.dp.toPx()),
-                                            end = Offset(tickScreenX, 22.dp.toPx()),
-                                            strokeWidth = 2.5.dp.toPx()
-                                        )
-                                        val label = when {
-                                            tick == 0.6f -> ".6"
-                                            tick == tick.toInt().toFloat() -> "${tick.toInt()}"
-                                            else -> "$tick"
-                                        }
-                                        drawIntoCanvas { canvas ->
-                                            textPaint.color = if (isCurrentStop) primaryArgb else android.graphics.Color.WHITE
-                                            canvas.nativeCanvas.drawText(label, tickScreenX, 34.dp.toPx(), textPaint)
-                                        }
-                                    } else if (isHalf) {
-                                        drawLine(
-                                            color = Color.White.copy(alpha = 0.55f),
-                                            start = Offset(tickScreenX, 8.dp.toPx()),
-                                            end = Offset(tickScreenX, 19.dp.toPx()),
-                                            strokeWidth = 1.6.dp.toPx()
-                                        )
-                                    } else {
-                                        drawLine(
-                                            color = Color.White.copy(alpha = 0.28f),
-                                            start = Offset(tickScreenX, 11.dp.toPx()),
-                                            end = Offset(tickScreenX, 17.dp.toPx()),
-                                            strokeWidth = 1.1.dp.toPx()
+                            Canvas(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                                    .padding(horizontal = 4.dp)
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = {
+                                                lastInteractionTime = System.currentTimeMillis()
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                lastInteractionTime = System.currentTimeMillis()
+                                                val deltaDp = -dragAmount.x / density
+                                                val currentX = zoomToRulerX(currentZoomRatio)
+                                                val newX = (currentX + deltaDp).coerceIn(0f, TOTAL_RULER_WIDTH_DP)
+                                                val newZoom = rulerXToZoom(newX)
+                                                val step = (newZoom * 10f).roundToInt()
+                                                if (step != lastHapticStep) {
+                                                    val roundedZoom = step / 10f
+                                                    if (MAJOR_STOPS.any { abs(it - roundedZoom) < 0.05f }) {
+                                                        tactile.triggerScrollSnap()
+                                                    } else {
+                                                        tactile.triggerScrollTick()
+                                                    }
+                                                    lastHapticStep = step
+                                                }
+                                                onZoomChanged((newZoom * 10f).roundToInt() / 10f)
+                                            },
+                                            onDragEnd = {
+                                                lastInteractionTime = System.currentTimeMillis()
+                                            }
                                         )
                                     }
+                            ) {
+                                val centerX = size.width / 2f
+                                val currentRulerX = zoomToRulerX(currentZoomRatio)
+
+                                // Draw ruler tick marks
+                                for (tick in RULER_TICKS) {
+                                    val tickScreenX = centerX + (zoomToRulerX(tick) - currentRulerX) * density
+                                    if (tickScreenX in -40f..(size.width + 40f)) {
+                                        val isMajor = MAJOR_STOPS.any { abs(it - tick) < 0.05f }
+                                        val isHalf = ((tick * 10f).roundToInt() % 5 == 0)
+
+                                        if (isMajor) {
+                                            val isCurrentStop = abs(tick - currentZoomRatio) < 0.05f
+                                            drawLine(
+                                                color = if (isCurrentStop) primaryColor else Color.White.copy(alpha = 0.9f),
+                                                start = Offset(tickScreenX, 4.dp.toPx()),
+                                                end = Offset(tickScreenX, 22.dp.toPx()),
+                                                strokeWidth = 2.5.dp.toPx()
+                                            )
+                                            val label = when {
+                                                tick == 0.6f -> ".6"
+                                                tick == tick.toInt().toFloat() -> "${tick.toInt()}"
+                                                else -> "$tick"
+                                            }
+                                            drawIntoCanvas { canvas ->
+                                                textPaint.color = if (isCurrentStop) primaryArgb else android.graphics.Color.WHITE
+                                                canvas.nativeCanvas.drawText(label, tickScreenX, 34.dp.toPx(), textPaint)
+                                            }
+                                        } else if (isHalf) {
+                                            drawLine(
+                                                color = Color.White.copy(alpha = 0.55f),
+                                                start = Offset(tickScreenX, 8.dp.toPx()),
+                                                end = Offset(tickScreenX, 19.dp.toPx()),
+                                                strokeWidth = 1.6.dp.toPx()
+                                            )
+                                        } else {
+                                            drawLine(
+                                                color = Color.White.copy(alpha = 0.28f),
+                                                start = Offset(tickScreenX, 11.dp.toPx()),
+                                                end = Offset(tickScreenX, 17.dp.toPx()),
+                                                strokeWidth = 1.1.dp.toPx()
+                                            )
+                                        }
+                                    }
                                 }
+
+                                // Center hairline needle (Glowing Primary indicator)
+                                drawLine(
+                                    color = primaryColor,
+                                    start = Offset(centerX, 0f),
+                                    end = Offset(centerX, 28.dp.toPx()),
+                                    strokeWidth = 3.dp.toPx()
+                                )
                             }
 
-                            // Center hairline needle (Glowing Primary indicator)
-                            drawLine(
-                                color = primaryColor,
-                                start = Offset(centerX, 0f),
-                                end = Offset(centerX, 28.dp.toPx()),
-                                strokeWidth = 3.dp.toPx()
-                            )
-                        }
-
-                        // Plus 0.1x Micro-step button
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .clickable {
-                                    tactile.triggerTick()
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    val next = ((currentZoomRatio + 0.1f) * 10f).roundToInt() / 10f
-                                    onZoomStep(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            // Plus 0.1x Micro-step button
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable {
+                                        tactile.triggerScrollTick()
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        val next = ((currentZoomRatio + 0.1f) * 10f).roundToInt() / 10f
+                                        onZoomStep(next.coerceIn(OpticalLens.MIN_ZOOM, OpticalLens.MAX_ZOOM))
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
                         }
                     }
                 }
@@ -366,12 +384,46 @@ fun ExpressiveLensSelector(
         }
 
         // Floating Compact M3 Pill Deck (.6, 1x, 2x, 3x)
+        // Supports Apple iOS / Vivo style horizontal drag-to-zoom directly on the pill bar
+        val pillDensity = LocalDensity.current.density
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = pillContainerColor,
             border = pillBorder,
             tonalElevation = if (isFull) 0.dp else 4.dp,
-            modifier = Modifier.height(48.dp)
+            modifier = Modifier
+                .height(48.dp)
+                .then(
+                    if (isBackCamera) {
+                        Modifier.pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    if (!isExpanded) onExpandedChange(true)
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    val currentX = zoomToRulerX(currentZoomRatio)
+                                    val newX = (currentX - dragAmount.x / pillDensity).coerceIn(0f, TOTAL_RULER_WIDTH_DP)
+                                    val newZoom = rulerXToZoom(newX)
+                                    val step = (newZoom * 10f).roundToInt()
+                                    if (step != lastHapticStep) {
+                                        val isMajor = MAJOR_STOPS.any { abs(it - (step / 10f)) < 0.05f }
+                                        if (isMajor) tactile.triggerScrollSnap() else tactile.triggerScrollTick()
+                                        lastHapticStep = step
+                                    }
+                                    onZoomChanged((newZoom * 10f).roundToInt() / 10f)
+                                },
+                                onDragEnd = {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                }
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
             Row(
                 modifier = Modifier
@@ -386,21 +438,30 @@ fun ExpressiveLensSelector(
                     presets.forEach { lens ->
                         val isSelected = activeLens == lens
 
-                        // Format pill label: if current zoom is intermediate (e.g. 1.2x), reflect it directly
+                        // Apple iOS simple pill ("1x" / "1.2x") in everyday Photo/Night modes vs full "1.0x • 24mm" telemetry in Pro mode
                         val pillLabel = if (isSelected) {
-                            val formattedZoom = if (currentZoomRatio >= 10f) {
-                                String.format(java.util.Locale.US, "%.0fx", currentZoomRatio)
-                            } else {
-                                String.format(java.util.Locale.US, "%.1fx", currentZoomRatio)
+                            val isExactStop = abs(currentZoomRatio - lens.zoomRatio) < 0.05f && lens != OpticalLens.UW
+                            val formattedZoom = when {
+                                currentZoomRatio >= 10f -> String.format(java.util.Locale.US, "%.0fx", currentZoomRatio)
+                                !isProMode && isExactStop -> "${lens.zoomRatio.toInt()}x"
+                                else -> String.format(java.util.Locale.US, "%.1fx", currentZoomRatio)
                             }
-                            val focalMm = OpticalLens.focalLengthForZoom(currentZoomRatio)
-                            "$formattedZoom • ${focalMm}mm"
+                            if (isProMode) {
+                                val focalMm = OpticalLens.focalLengthForZoom(currentZoomRatio)
+                                "$formattedZoom • ${focalMm}mm"
+                            } else {
+                                formattedZoom
+                            }
                         } else {
                             lens.label
                         }
 
                         val pillWidth by animateDpAsState(
-                            targetValue = if (isSelected) 88.dp else 40.dp,
+                            targetValue = when {
+                                isSelected && isProMode -> 88.dp
+                                isSelected -> 52.dp
+                                else -> 40.dp
+                            },
                             animationSpec = GXVMotion.pillMorph(),
                             label = "lensPillWidth"
                         )
@@ -416,12 +477,12 @@ fun ExpressiveLensSelector(
                                 .clickable {
                                     if (isSelected) {
                                         // Tapping already-selected lens toggles the continuous zoom ruler
-                                        tactile.triggerSnap()
+                                        tactile.triggerScrollSnap()
                                         onExpandedChange(!isExpanded)
                                         lastInteractionTime = System.currentTimeMillis()
                                     } else {
                                         // Tapping different lens snaps to its preset
-                                        tactile.triggerSnap()
+                                        tactile.triggerScrollSnap()
                                         lastInteractionTime = System.currentTimeMillis()
                                         onLensSelected(lens)
                                     }
@@ -435,34 +496,37 @@ fun ExpressiveLensSelector(
                                 } else {
                                     Color.White.copy(alpha = 0.85f)
                                 },
-                                fontSize = if (isSelected) 11.sp else 13.sp,
+                                fontSize = if (isSelected && isProMode) 11.sp else 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                textAlign = TextAlign.Center,
                                 maxLines = 1
                             )
                         }
                     }
 
-                    // Ruler Expansion Toggle button
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isExpanded) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+                    // Ruler Expansion Toggle button (Pro mode only; tapping active lens pill toggles ruler everywhere)
+                    if (isProMode) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isExpanded) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+                                )
+                                .clickable {
+                                    tactile.triggerSnap()
+                                    onExpandedChange(!isExpanded)
+                                    lastInteractionTime = System.currentTimeMillis()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Expand Continuous Zoom Wheel",
+                                tint = if (isExpanded) MaterialTheme.colorScheme.onSecondaryContainer else Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
                             )
-                            .clickable {
-                                tactile.triggerSnap()
-                                onExpandedChange(!isExpanded)
-                                lastInteractionTime = System.currentTimeMillis()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "Expand Continuous Zoom Wheel",
-                            tint = if (isExpanded) MaterialTheme.colorScheme.onSecondaryContainer else Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(18.dp)
-                        )
+                        }
                     }
                 } else {
                     // Front Camera: 1.0x (normal view angle) and 1.4x (portrait mode crop)
@@ -486,7 +550,7 @@ fun ExpressiveLensSelector(
                                     if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                 )
                                 .clickable {
-                                    tactile.triggerSnap()
+                                    tactile.triggerScrollSnap()
                                     onZoomStep(zoomStop)
                                 },
                             contentAlignment = Alignment.Center

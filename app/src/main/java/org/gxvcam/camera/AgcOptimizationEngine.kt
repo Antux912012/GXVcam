@@ -5,6 +5,7 @@ import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import org.gxvcam.ui.state.AgcLibPatcherSettings
+import org.gxvcam.ui.state.CameraMode
 import org.gxvcam.ui.state.OpticalLens
 
 object AgcOptimizationEngine {
@@ -13,7 +14,9 @@ object AgcOptimizationEngine {
     fun buildAgcRequestOptions(
         agc: AgcLibPatcherSettings,
         activeLens: OpticalLens = OpticalLens.MAIN_1X,
-        supportedKeys: Set<String> = emptySet()
+        supportedKeys: Set<String> = emptySet(),
+        cameraMode: CameraMode = CameraMode.PHOTO,
+        hasOis: Boolean = true
     ): CaptureRequestOptions {
         val builder = CaptureRequestOptions.Builder()
 
@@ -27,7 +30,7 @@ object AgcOptimizationEngine {
             }
         }
 
-        // 1. Sharpness Level (gsharpen)
+        // 1. Sharpness & Edge Enhancement
         val edgeMode = if (agc.sharpnessLevel >= 0.5f) {
             CaptureRequest.EDGE_MODE_HIGH_QUALITY
         } else {
@@ -35,7 +38,7 @@ object AgcOptimizationEngine {
         }
         builder.setCaptureRequestOption(CaptureRequest.EDGE_MODE, edgeMode)
 
-        // 2. Luma Denoise Level (Spatial)
+        // 2. Spatial & Multi-Frame Noise Reduction
         val noiseReductionMode = when {
             agc.lumaDenoiseLevel >= 1.0f -> CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY
             agc.lumaDenoiseLevel >= 0.3f -> CaptureRequest.NOISE_REDUCTION_MODE_MINIMAL
@@ -43,7 +46,7 @@ object AgcOptimizationEngine {
         }
         builder.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, noiseReductionMode)
 
-        // 3. Contrast & Tonemap: Use ISP HIGH_QUALITY tonemapping to preserve sRGB / D65 color calibration
+        // 3. Tonemap, Color Correction, Aberration, Hot Pixel & OIS
         builder.setCaptureRequestOption(
             CaptureRequest.TONEMAP_MODE,
             CaptureRequest.TONEMAP_MODE_HIGH_QUALITY
@@ -56,8 +59,6 @@ object AgcOptimizationEngine {
             CaptureRequest.CONTROL_AWB_MODE,
             CaptureRequest.CONTROL_AWB_MODE_AUTO
         )
-
-        // 4. Optical Aberration & Hot Pixel Modes
         builder.setCaptureRequestOption(
             CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE,
             CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY
@@ -66,21 +67,21 @@ object AgcOptimizationEngine {
             CaptureRequest.HOT_PIXEL_MODE,
             CaptureRequest.HOT_PIXEL_MODE_HIGH_QUALITY
         )
+        builder.setCaptureRequestOption(
+            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+            if (hasOis) CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
+            else CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
+        )
 
-        // 5. Motorola Tintless & In-Sensor Crop tuning (checked against supported keys)
-        setIfSupported(MtkMotoVendorTags.MOTO_TINTLESS_ENABLE, 1)
-        setIfSupported(MtkMotoVendorTags.MOTO_ADRC_ENABLE, 1)
-        if (activeLens == OpticalLens.CROP_2X) {
-            setIfSupported(MtkMotoVendorTags.MOTO_IN_SENSOR_CROP_ENABLE, 1)
-        }
-
-        // 6. MediaTek Dimensity Multi-Frame Noise Reduction (MFNR) & Best Shot Selector
+        // 4. Safe MediaTek Imagiq 950 & Motorola In-Sensor Crop Hints
+        // NOTE: Do NOT set MTK_HDR_MODE / MTK_SESSION_HDR_MODE / MTK_SINGLE_YUV_NR / MTK_HIGH_QUALITY_YUV
+        // on repeating CameraX Preview requests, as Imagiq 950 switches to an unconfigured staggered
+        // VHDR sensor channel on Camera 0, 1, and 2, causing a solid green viewfinder.
         setIfSupported(MtkMotoVendorTags.MTK_MFNR_MFB_MODE, 1)
-        setIfSupported(MtkMotoVendorTags.MTK_MFNR_BSS_COUNT, 4)
-        setIfSupported(MtkMotoVendorTags.MTK_ZSL_MODE, 1)
-        setIfSupported(MtkMotoVendorTags.MOTO_ZSL_MODE, 1)
 
-        // 7. MediaTek Dimensity / Motorola ZSL Session Fix
+        val isInSensorCrop = activeLens == OpticalLens.CROP_2X
+        setIfSupported(MtkMotoVendorTags.MOTO_IN_SENSOR_CROP_ENABLE, (if (isInSensorCrop) 1 else 0).toByte())
+
         if (agc.hdrNetMultiFrameBoost) {
             builder.setCaptureRequestOption(CaptureRequest.CONTROL_ENABLE_ZSL, true)
         }

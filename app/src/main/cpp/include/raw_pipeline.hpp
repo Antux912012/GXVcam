@@ -30,6 +30,39 @@ struct FrameMetadata {
     CfaBlackLevel black_level{};   // SENSOR_DYNAMIC_BLACK_LEVEL, fallback SENSOR_BLACK_LEVEL_PATTERN
     CfaPattern cfa = CfaPattern::RGGB;
     std::array<float, 3> as_shot_neutral{1.f, 1.f, 1.f};  // SENSOR_NEUTRAL_COLOR_POINT
+    float ev_offset = 0.0f;        // 0.0f for EV0 ZSL, -2.5f for LOFIC highlight bracket
+};
+
+// Per-CFA noise model: variance = scale[c] * intensity + offset[c]
+// Derived from android.sensor.noiseProfile.
+struct NoiseProfile {
+    std::array<float, 4> scale{1e-4f, 1e-4f, 1e-4f, 1e-4f};
+    std::array<float, 4> offset{1e-6f, 1e-6f, 1e-6f, 1e-6f};
+};
+
+// Lightweight view or owned container for multi-frame Bayer processing.
+struct RawFrame {
+    FrameMetadata meta;
+    NoiseProfile noise;
+    const float* normalized_bayer = nullptr;
+    size_t pixel_count = 0;
+};
+
+// 400 Hz gyroscope sample for Synthetic EVS PSF deconvolution and alignment seeding.
+struct GyroSample {
+    int64_t timestamp_ns = 0;
+    float wx = 0.0f;  // rad/s around X (pitch)
+    float wy = 0.0f;  // rad/s around Y (yaw)
+    float wz = 0.0f;  // rad/s around Z (roll)
+};
+
+// Telemetry timings (microseconds) captured across native pipeline stages.
+struct SignaturePipelineTelemetry {
+    double unpack_ms = 0.0;
+    double align_merge_ms = 0.0;
+    double tonemap_ms = 0.0;
+    double deblur_ms = 0.0;
+    double drizzle_ms = 0.0;
 };
 
 // ImageFormat.RAW10 (MIPI CSI-2 packed: 4 px in 5 bytes, LSBs in 5th byte,

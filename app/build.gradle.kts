@@ -6,15 +6,15 @@ plugins {
 
 android {
     namespace = "org.gxvcam"
-    compileSdk = 35
+    compileSdk = 37
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "org.gxvcam"
         minSdk = 34
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.3.2"
+        versionCode = 6
+        versionName = "0.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -81,6 +81,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.datastore.preferences)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -99,6 +100,11 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions)
     implementation(libs.androidx.camera.viewfinder.compose)
+
+    // Google LiteRT (On-Device NPU/GPU Runtime for MediaTek APU 655)
+    implementation(libs.litert)
+    implementation(libs.litert.gpu)
+    implementation(libs.litert.support)
 
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation("junit:junit:4.13.2")

@@ -8,7 +8,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lens
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gxvcam.ui.state.MotoPortraitLens
@@ -104,7 +107,7 @@ fun MotoPortraitDeck(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) primaryColor else Color.Transparent)
                                     .clickable {
-                                        tactile.triggerTick()
+                                        tactile.triggerScrollTick()
                                         onApertureChanged(f)
                                     }
                                     .padding(horizontal = 6.dp, vertical = 4.dp),
@@ -114,6 +117,7 @@ fun MotoPortraitDeck(
                                     text = if (f == 16f) "16" else String.format(java.util.Locale.US, "%.1f", f),
                                     fontSize = 11.sp,
                                     fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
                                     color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.7f)
                                 )
                             }
@@ -123,10 +127,11 @@ fun MotoPortraitDeck(
             }
         }
 
-        // Aperture Pill Button & 4-Prime Segment Bar
+        // Aperture Pill Button & 5-Prime Segment Bar
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 10.dp)
         ) {
             // Aperture Toggle Pill
             Surface(
@@ -142,7 +147,7 @@ fun MotoPortraitDeck(
                     }
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -161,7 +166,7 @@ fun MotoPortraitDeck(
                 }
             }
 
-            // Motorola 4-Prime Focal Length Deck (24mm, 35mm, 50mm, 85mm)
+            // Motorola 5-Prime Focal Length Deck (24mm, 35mm, 50mm, 73mm, 85mm)
             Surface(
                 shape = RoundedCornerShape(22.dp),
                 color = containerColor,
@@ -169,8 +174,10 @@ fun MotoPortraitDeck(
                 modifier = Modifier.height(42.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 5.dp, vertical = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     MotoPortraitLens.entries.forEach { pLens ->
@@ -180,17 +187,18 @@ fun MotoPortraitDeck(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(if (isSelected) primaryColor else Color.Transparent)
                                 .clickable {
-                                    tactile.triggerTick()
+                                    tactile.triggerScrollTick()
                                     onLensSelected(pLens)
                                 }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = 9.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = pLens.label,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
                                     color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.85f)
                                 )
                             }

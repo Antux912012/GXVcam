@@ -1,0 +1,15 @@
+# Ignore compiled binaries, NDK intermediates, large probe dumps, and local secrets
+.cxx/
+build/
+app/build/
+.gradle/
+*.so
+*.spv
+*.bin
+*.tflite
+*.apk
+*.aab
+*.keystore
+probe_out/
+tools/oem_analysis/*.apk
+tools/oem_analysis/extracted_mcf/

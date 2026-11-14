@@ -2,7 +2,9 @@ package org.gxvcam.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -37,6 +39,7 @@ val M3ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(32.dp)
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun GXVcamTheme(
     accentTheme: AccentTheme = AccentTheme.PANTONE_POINCIANA,
@@ -62,18 +65,40 @@ fun GXVcamTheme(
         )
     }
 
-    // Force OLED pure black background and custom elevated dark surfaces while preserving chosen accents
-    val expressiveColorScheme = baseScheme.copy(
-        background = OledBlack,
-        surface = DarkSurfaceElevated,
-        surfaceContainer = DarkSurfaceContainer,
-        surfaceContainerHigh = DarkSurfaceContainerHigh,
-        primary = if (accentTheme == AccentTheme.DYNAMIC_SYSTEM) baseScheme.primary else Color(accentTheme.colorHex),
-        primaryContainer = if (accentTheme == AccentTheme.DYNAMIC_SYSTEM) baseScheme.primaryContainer else Color(accentTheme.containerHex),
-    )
+    // Apply Nord Polar Night / Frost surfaces when NORD_FROST is active, otherwise OLED pure black
+    val expressiveColorScheme = if (accentTheme == AccentTheme.NORD_FROST) {
+        baseScheme.copy(
+            background = NordPolarNight0,
+            onBackground = NordSnowStorm,
+            surface = NordPolarNight1,
+            onSurface = NordSnowStorm,
+            surfaceContainer = NordPolarNight1,
+            surfaceContainerHigh = NordPolarNight2,
+            surfaceVariant = NordPolarNight2,
+            onSurfaceVariant = NordSnowStorm.copy(alpha = 0.85f),
+            primary = NordFrostCyan,
+            onPrimary = NordPolarNight0,
+            primaryContainer = NordPolarNight1,
+            onPrimaryContainer = NordFrostCyan,
+            secondary = NordFrostBlue,
+            onSecondary = NordPolarNight0,
+            tertiary = NordFrostBlue,
+            onTertiary = NordPolarNight0
+        )
+    } else {
+        baseScheme.copy(
+            background = OledBlack,
+            surface = DarkSurfaceElevated,
+            surfaceContainer = DarkSurfaceContainer,
+            surfaceContainerHigh = DarkSurfaceContainerHigh,
+            primary = if (accentTheme == AccentTheme.DYNAMIC_SYSTEM) baseScheme.primary else Color(accentTheme.colorHex),
+            primaryContainer = if (accentTheme == AccentTheme.DYNAMIC_SYSTEM) baseScheme.primaryContainer else Color(accentTheme.containerHex),
+        )
+    }
 
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = expressiveColorScheme,
+        motionScheme = MotionScheme.expressive(),
         shapes = M3ExpressiveShapes,
         content = content
     )

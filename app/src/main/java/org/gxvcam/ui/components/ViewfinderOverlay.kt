@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -39,6 +40,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -54,6 +56,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun GXVViewfinderContainer(
@@ -62,8 +65,11 @@ fun GXVViewfinderContainer(
     gridType: GridType = GridType.RULE_OF_THIRDS,
     showHorizon: Boolean,
     levelHorizonDegrees: Float,
+    deviceCardinalAngle: Int = 0,
+    isHorizonPlanar: Boolean = false,
     currentZoom: Float,
     isBackCamera: Boolean = true,
+    showSplitAeAfLocks: Boolean = false,
     isAeLocked: Boolean = false,
     isAfLocked: Boolean = false,
     isAeAfLocked: Boolean = isAeLocked && isAfLocked,
@@ -84,7 +90,7 @@ fun GXVViewfinderContainer(
     }
 
     fun triggerNiagaraTick() {
-        tactile.triggerTick()
+        tactile.triggerScrollTick()
     }
 
     // Tap-to-focus indicator & AE/AF Lock state
@@ -118,9 +124,9 @@ fun GXVViewfinderContainer(
         }
     }
 
-    // Horizon leveler haptic snap trigger
+    // Horizon leveler haptic snap trigger (suppressed when phone is planar / tilted > 63°)
     var wasLevel by remember { mutableStateOf(false) }
-    val isLevel = abs(levelHorizonDegrees) < 1.0f
+    val isLevel = !isHorizonPlanar && abs(levelHorizonDegrees) < 1.0f
     LaunchedEffect(isLevel) {
         if (isLevel && !wasLevel) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -132,7 +138,7 @@ fun GXVViewfinderContainer(
     val latestZoom by rememberUpdatedState(currentZoom)
     val latestContainerSize by rememberUpdatedState(containerSize)
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(OledBlack),
@@ -153,10 +159,13 @@ fun GXVViewfinderContainer(
             label = "viewfinderRatio"
         )
 
+        val containerRatio = if (maxHeight > 0.dp) maxWidth / maxHeight else 9f / 20f
+        val matchHeightFirst = animatedAspectRatio < containerRatio
+
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(animatedAspectRatio)
+                .then(if (matchHeightFirst) Modifier.fillMaxHeight() else Modifier.fillMaxWidth())
+                .aspectRatio(animatedAspectRatio, matchHeightConstraintsFirst = matchHeightFirst)
                 .clip(RoundedCornerShape(cornerRadius))
                 .clipToBounds()
                 .onSizeChanged { containerSize = it }
@@ -171,9 +180,9 @@ fun GXVViewfinderContainer(
                             val step = (targetZoom * 10f).roundToInt()
                             if (step != lastZoomTickStep) {
                                 if (step == 10 || (isBackCamera && (step == 6 || step == 20 || step == 30))) {
-                                    tactile.triggerSnap()
+                                    tactile.triggerScrollSnap()
                                 } else {
-                                    tactile.triggerTick()
+                                    tactile.triggerScrollTick()
                                 }
                                 lastZoomTickStep = step
                             }
@@ -284,46 +293,110 @@ fun GXVViewfinderContainer(
                 }
             }
 
-            // Calibrated Gyroscopic Horizon Leveler
+            // Calibrated Gyroscopic Horizon Leveler (Portrait & Landscape aware)
             if (showHorizon) {
+                val targetScreenAngle = -(deviceCardinalAngle.toFloat() + levelHorizonDegrees)
+                var unwrappedScreenAngle by remember { mutableFloatStateOf(targetScreenAngle) }
+                SideEffect {
+                    val delta = ((targetScreenAngle - unwrappedScreenAngle + 540f) % 360f + 360f) % 360f - 180f
+                    unwrappedScreenAngle += delta
+                }
+                val animatedHorizonAngle by animateFloatAsState(
+                    targetValue = unwrappedScreenAngle,
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    label = "horizonRotation",
+                )
+
+                val targetCardinalScreenAngle = -deviceCardinalAngle.toFloat()
+                var unwrappedCardinalAngle by remember { mutableFloatStateOf(targetCardinalScreenAngle) }
+                SideEffect {
+                    val delta = ((targetCardinalScreenAngle - unwrappedCardinalAngle + 540f) % 360f + 360f) % 360f - 180f
+                    unwrappedCardinalAngle += delta
+                }
+                val animatedCardinalAngle by animateFloatAsState(
+                    targetValue = unwrappedCardinalAngle,
+                    animationSpec = GXVMotion.spatialSmooth(),
+                    label = "horizonCardinalRotation",
+                )
+
+                val horizonAlpha = if (isHorizonPlanar) 0.20f else if (isLevel) 0.95f else 0.65f
                 val horizonColor by animateColorAsState(
-                    targetValue = if (isLevel) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.45f),
+                    targetValue = if (isLevel) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = horizonAlpha),
                     animationSpec = GXVMotion.fastEffects(),
                     label = "horizonColor",
                 )
+                val referenceColor = Color.White.copy(alpha = if (isHorizonPlanar) 0.14f else 0.35f)
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 24.dp),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     Canvas(
-                        modifier = Modifier
-                            .fillMaxWidth(0.72f)
-                            .height(60.dp)
-                            .rotate(-levelHorizonDegrees),
+                        modifier = Modifier.size(220.dp),
                     ) {
-                        val centerY = size.height / 2f
-                        // Left & Right horizon wings
-                        drawLine(
+                        val center = Offset(size.width / 2f, size.height / 2f)
+                        val wingOuter = size.width * 0.44f
+                        val wingInner = size.width * 0.12f
+
+                        // Fixed cardinal horizon reference ticks
+                        rotate(degrees = animatedCardinalAngle, pivot = center) {
+                            val tickOuter = wingOuter + 8.dp.toPx()
+                            val tickInner = wingOuter + 1.dp.toPx()
+                            drawLine(
+                                color = referenceColor,
+                                start = Offset(center.x - tickOuter, center.y),
+                                end = Offset(center.x - tickInner, center.y),
+                                strokeWidth = 1.5.dp.toPx(),
+                                cap = StrokeCap.Round,
+                            )
+                            drawLine(
+                                color = referenceColor,
+                                start = Offset(center.x + tickInner, center.y),
+                                end = Offset(center.x + tickOuter, center.y),
+                                strokeWidth = 1.5.dp.toPx(),
+                                cap = StrokeCap.Round,
+                            )
+                        }
+
+                        // Moving horizon wings + center pivot dot
+                        rotate(degrees = animatedHorizonAngle, pivot = center) {
+                            drawLine(
+                                color = horizonColor,
+                                start = Offset(center.x - wingOuter, center.y),
+                                end = Offset(center.x - wingInner, center.y),
+                                strokeWidth = if (isLevel) 2.5.dp.toPx() else 2.dp.toPx(),
+                                cap = StrokeCap.Round,
+                            )
+                            drawLine(
+                                color = horizonColor,
+                                start = Offset(center.x + wingInner, center.y),
+                                end = Offset(center.x + wingOuter, center.y),
+                                strokeWidth = if (isLevel) 2.5.dp.toPx() else 2.dp.toPx(),
+                                cap = StrokeCap.Round,
+                            )
+                            drawCircle(
+                                color = horizonColor,
+                                radius = if (isLevel) 3.5.dp.toPx() else 2.5.dp.toPx(),
+                                center = center,
+                            )
+                        }
+                    }
+
+                    if (!isHorizonPlanar) {
+                        val roundedDeg = levelHorizonDegrees.roundToInt()
+                        val degLabel = if (isLevel) "0°" else String.format(Locale.US, "%+d°", roundedDeg)
+                        Text(
+                            text = degLabel,
+                            fontSize = 10.sp,
+                            fontWeight = if (isLevel) FontWeight.Bold else FontWeight.Medium,
                             color = horizonColor,
-                            start = Offset(0f, centerY),
-                            end = Offset(size.width * 0.38f, centerY),
-                            strokeWidth = 2.dp.toPx(),
-                            cap = StrokeCap.Round,
-                        )
-                        drawLine(
-                            color = horizonColor,
-                            start = Offset(size.width * 0.62f, centerY),
-                            end = Offset(size.width, centerY),
-                            strokeWidth = 2.dp.toPx(),
-                            cap = StrokeCap.Round,
-                        )
-                        drawCircle(
-                            color = horizonColor,
-                            radius = 3.dp.toPx(),
-                            center = Offset(size.width / 2f, centerY),
+                            modifier = Modifier.graphicsLayer {
+                                rotationZ = animatedCardinalAngle
+                                val rad = Math.toRadians(animatedCardinalAngle.toDouble())
+                                val shiftPx = 22.dp.toPx()
+                                translationX = (-sin(rad) * shiftPx).toFloat()
+                                translationY = (cos(rad) * shiftPx).toFloat()
+                            },
                         )
                     }
                 }
@@ -392,86 +465,125 @@ fun GXVViewfinderContainer(
                     }
                 }
 
-                // 2. Separate AE-L and AF-L Lock Badge Pills (Above Reticle)
-                Row(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                (pos.x - with(density) { 56.dp.toPx() }).roundToInt(),
-                                (pos.y - with(density) { 62.dp.toPx() }).roundToInt()
-                            )
-                        },
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // AE-L Lock Pill
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isAeLocked) Color(0xDDFFB74D) else Color(0xAA000000),
-                        border = BorderStroke(1.dp, if (isAeLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f)),
-                        modifier = Modifier.clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onEvent(
-                                GXVcamEvent.SetAeLock(
-                                    locked = !isAeLocked,
-                                    x = pos.x,
-                                    y = pos.y
+                // 2. Lock Badges (Split AE-L / AF-L in Pro Mode; iOS-style AE/AF LOCK pill only when locked in Photo)
+                if (showSplitAeAfLocks) {
+                    Row(
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    (pos.x - with(density) { 56.dp.toPx() }).roundToInt(),
+                                    (pos.y - with(density) { 64.dp.toPx() }).roundToInt()
                                 )
-                            )
-                        }
+                            },
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        // AE-L Lock Pill
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isAeLocked) Color(0xDDFFB74D) else Color(0xAA000000),
+                            border = BorderStroke(1.dp, if (isAeLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onEvent(
+                                    GXVcamEvent.SetAeLock(
+                                        locked = !isAeLocked,
+                                        x = pos.x,
+                                        y = pos.y
+                                    )
+                                )
+                            }
                         ) {
-                            Icon(
-                                imageVector = if (isAeLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                                contentDescription = "AE Lock",
-                                tint = if (isAeLocked) Color.Black else Color.White,
-                                modifier = Modifier.size(11.dp)
-                            )
-                            Text(
-                                text = "AE-L",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isAeLocked) Color.Black else Color.White
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isAeLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                    contentDescription = "AE Lock",
+                                    tint = if (isAeLocked) Color.Black else Color.White,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = "AE-L",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    color = if (isAeLocked) Color.Black else Color.White
+                                )
+                            }
+                        }
+
+                        // AF-L Lock Pill
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isAfLocked) Color(0xDDFFB74D) else Color(0xAA000000),
+                            border = BorderStroke(1.dp, if (isAfLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onEvent(
+                                    GXVcamEvent.SetAfLock(
+                                        locked = !isAfLocked,
+                                        x = pos.x,
+                                        y = pos.y
+                                    )
+                                )
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isAfLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                    contentDescription = "AF Lock",
+                                    tint = if (isAfLocked) Color.Black else Color.White,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = "AF-L",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    color = if (isAfLocked) Color.Black else Color.White
+                                )
+                            }
                         }
                     }
-
-                    // AF-L Lock Pill
+                } else if (anyLocked) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = if (isAfLocked) Color(0xDDFFB74D) else Color(0xAA000000),
-                        border = BorderStroke(1.dp, if (isAfLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f)),
-                        modifier = Modifier.clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onEvent(
-                                GXVcamEvent.SetAfLock(
-                                    locked = !isAfLocked,
-                                    x = pos.x,
-                                    y = pos.y
+                        color = Color(0xDDFFB74D),
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    (pos.x - with(density) { 44.dp.toPx() }).roundToInt(),
+                                    (pos.y - with(density) { 62.dp.toPx() }).roundToInt()
                                 )
-                            )
-                        }
+                            }
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onEvent(GXVcamEvent.SetAeAfLock(locked = false, x = pos.x, y = pos.y))
+                            }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
-                                imageVector = if (isAfLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                                contentDescription = "AF Lock",
-                                tint = if (isAfLocked) Color.Black else Color.White,
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "AE/AF Locked",
+                                tint = Color.Black,
                                 modifier = Modifier.size(11.dp)
                             )
                             Text(
-                                text = "AF-L",
+                                text = "AE/AF LOCK",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isAfLocked) Color.Black else Color.White
+                                color = Color.Black
                             )
                         }
                     }

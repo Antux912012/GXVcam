@@ -97,8 +97,7 @@ enum class VideoResolution(val label: String, val shortLabel: String) {
 
 enum class VideoFrameRate(val fps: Int, val label: String) {
     FPS_30(30, "30fps"),
-    FPS_60(60, "60fps"),
-    SLOW_MO_120(120, "120fps")
+    FPS_60(60, "60fps")
 }
 
 enum class DualCaptureLayout(val label: String) {
@@ -115,6 +114,7 @@ enum class MotoPortraitLens(
     WIDE_24MM(24, 1.0f, "24mm", "Wide"),
     STANDARD_35MM(35, 1.5f, "35mm", "Standard"),
     FULL_VIEW_50MM(50, 2.0f, "50mm", "Full View"),
+    TELE_73MM(73, 3.0f, "73mm", "Tele"),
     CLOSE_UP_85MM(85, 3.5f, "85mm", "Close-Up")
 }
 
@@ -122,6 +122,31 @@ enum class WatermarkStyle(val label: String) {
     OFF("Off"),
     DEVICE("Device Stamp (Motorola)"),
     FILM_FRAME("Pantone Film Frame")
+}
+
+enum class VideoCodecProfile(val label: String, val shortLabel: String, val mimeType: String, val is10BitCapable: Boolean) {
+    H264_AVC("H.264 AVC", "H.264", "video/avc", false),
+    H265_HEVC("HEVC 10-bit", "HEVC", "video/hevc", true),
+    AV1("AV1 (Beta SW)", "AV1", "video/av01", false)
+}
+
+enum class VideoColorProfile(val label: String, val shortLabel: String, val is10Bit: Boolean) {
+    REC709_STANDARD("Rec.709 SDR", "Rec.709", false),
+    HLG_HDR10("HLG 10-bit", "HLG 10", true),
+    GXV_LOG_ACES("GXV-Log (ACES)", "GXV-Log", true)
+}
+
+enum class AudioInputSource(val label: String, val shortLabel: String) {
+    CAMCORDER_STEREO("Internal Dual Mic", "Dual Mic"),
+    REAR_SUBJECT_FOCUS("Audio Zoom (Subject)", "Audio Zoom"),
+    EXTERNAL_USBC_BLE("External USB-C / BT", "USB/BT Mic")
+}
+
+enum class ProVideoLutStyle(val label: String, val index: Int) {
+    VIVO_NATURAL("Natural", 0),
+    OPPO_LUMO_FILM("Lumo Film", 1),
+    SIGNATURE_LUT("Signature", 2),
+    APPLE_LOG_NEUTRAL("ACES Log", 3)
 }
 
 @Immutable
@@ -135,6 +160,17 @@ data class MotoVideoSettings(
     val isDualCaptureEnabled: Boolean = false,
     val dualCaptureLayout: DualCaptureLayout = DualCaptureLayout.PIP,
     val isDualCaptureSwapped: Boolean = false,
+    // Sprint 8: GXV Pro Video & Cross-Lens Cinema Pipeline
+    val isProVideoEngineEnabled: Boolean = true,
+    val codecProfile: VideoCodecProfile = VideoCodecProfile.H265_HEVC,
+    val colorProfile: VideoColorProfile = VideoColorProfile.REC709_STANDARD,
+    val isShutter180Locked: Boolean = true,
+    val audioInputSource: AudioInputSource = AudioInputSource.REAR_SUBJECT_FOCUS,
+    val selectedAudioDeviceId: Int? = null,
+    val isWindNoiseCutEnabled: Boolean = true,
+    val activeLutStyle: ProVideoLutStyle = ProVideoLutStyle.SIGNATURE_LUT,
+    val lutBlend: Float = 0.72f,
+    val vibrance: Float = 0.18f,
 )
 
 enum class AgcColorProfile(
@@ -175,6 +211,19 @@ enum class AgcColorProfile(
         rGain = 1.04f,
         gGain = 1.01f,
         bGain = 1.10f
+    ),
+    SIGNATURE_LUT(
+        label = "Signature",
+        description = "Signature rich ICtCp tone-mapped color, crisp micro-contrast & protected skin tones",
+        saturationBoost = 1.06f,
+        contrastCurve = 1.12f,
+        highlightKnee = 0.70f,
+        shadowLift = 0.14f,
+        acutance = 1.28f,
+        vignetteStrength = 0.0f,
+        rGain = 1.01f,
+        gGain = 1.00f,
+        bGain = 1.03f
     ),
     GCAM_HDR_PLUS(
         label = "GCam HDR+",
@@ -348,12 +397,49 @@ enum class AccentTheme(
     PANTONE_GRISAILLE("Grisaille", "Edge 50 Neo slate grey", 0xFFB0BEC5, 0xFF263238),
     LEICA_AMBER("Leica Amber", "Classic camera gold/amber", 0xFFFFB300, 0xFF4D3800),
     MINT_EXPRESSIVE("Expressive Mint", "M3 Expressive teal mint", 0xFF30D158, 0xFF0D421D),
+    NORD_FROST("Nord Frost", "Nordic slate & frost cyan (#88C0D0)", 0xFF88C0D0, 0xFF3B4252),
 }
 
 enum class VolumeKeyAction(val label: String, val shortLabel: String, val description: String) {
     ZOOM("Zoom In / Out", "Zoom", "Volume Up zooms in, Volume Down zooms out with cinema curve"),
     SHUTTER("Shutter / Record", "Shutter", "Volume buttons capture photo or start/stop video"),
     VOLUME("System Volume", "Volume", "Volume buttons control device system audio volume")
+}
+
+enum class AiProcessingBackend(val label: String, val shortLabel: String, val description: String) {
+    GXV_HYBRID_AI(
+        label = "GXV Hybrid AI",
+        shortLabel = "GXV Hybrid",
+        description = "Custom Vulkan RAW16 LOFIC + MediaTek APU 655 INT8 neural pipeline"
+    ),
+    AUTO_BATTERY_FALLBACK(
+        label = "Auto Fallback",
+        shortLabel = "Auto Fallback",
+        description = "Uses GXV Hybrid normally; falls back to Moto AI if Battery <= 20% or Thermal >= Moderate"
+    ),
+    MOTO_AI_FALLBACK(
+        label = "Built-in Moto AI",
+        shortLabel = "Moto AI Stock",
+        description = "Motorola OEM Camera Extensions & Imagiq 950 hardware ISP pipeline"
+    )
+}
+
+enum class NpuPowerProfile(val label: String, val shortLabel: String, val description: String) {
+    APU655_BATTERY_SAVER(
+        label = "APU 655 Eco",
+        shortLabel = "NPU Eco",
+        description = "NNAPI EXECUTION_PREFERENCE_LOW_POWER on MediaTek NPU 655"
+    ),
+    APU655_SUSTAINED_SPEED(
+        label = "APU 655 Turbo",
+        shortLabel = "NPU Turbo",
+        description = "NNAPI EXECUTION_PREFERENCE_SUSTAINED_SPEED on MediaTek NPU 655"
+    ),
+    GPU_MALI_FP16(
+        label = "Mali-G615 GPU",
+        shortLabel = "Mali GPU",
+        description = "LiteRT GPU Delegate on ARM Mali-G615 MC2"
+    )
 }
 
 @Immutable
@@ -367,7 +453,7 @@ data class CameraManualSettings(
     val isRawAndJpegEnabled: Boolean = false,
     val captureFormat: CaptureFormat = CaptureFormat.JPEG,
     val colorSpace: ColorSpaceOption = ColorSpaceOption.SRGB,
-    val jpegQuality: Int = 85,
+    val jpegQuality: Int = 95,
     val hdrFrameCount: Int = 8,
     val watermarkStyle: WatermarkStyle = WatermarkStyle.OFF,
     val watermarkSignature: String = "",
@@ -379,6 +465,22 @@ data class CameraManualSettings(
     val proLayoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
     val accentTheme: AccentTheme = AccentTheme.DYNAMIC_SYSTEM,
     val volumeKeyAction: VolumeKeyAction = VolumeKeyAction.ZOOM,
+    // Computational photography toggles (vEVS & Signature 27 unconditional pipeline disabled)
+    val isSignature27PipelineEnabled: Boolean = false,
+    val isSyntheticEvsDeblurEnabled: Boolean = false,
+    val isDrizzleMfsrEnabled: Boolean = true,
+    val isPortraitDepthSlabEnabled: Boolean = true,
+    val isUltraHdrGainmapEnabled: Boolean = true,
+    val isRotaryZoomDialEnabled: Boolean = false,
+    val isFrontHighRes32MpEnabled: Boolean = true,
+    val isAutoGroupSelfieEnabled: Boolean = false,
+    // Sprint 7: Dual-Path AI Engine & MediaTek APU 655 NPU Power Scheduler
+    val aiBackend: AiProcessingBackend = AiProcessingBackend.GXV_HYBRID_AI,
+    val npuPowerProfile: NpuPowerProfile = NpuPowerProfile.APU655_BATTERY_SAVER,
+    val useInternalNpuOnly: Boolean = true,
+    val isVirtualEvsOverlayVisible: Boolean = false,
+    // User UI preference: Haptic feedback on zoom controls and scroll/slider bars
+    val isZoomScrollHapticsEnabled: Boolean = true,
 )
 
 @Immutable
@@ -434,12 +536,17 @@ data class GXVcamUiState(
     val isCapturingPhoto: Boolean = false,
     val lastCapturedUri: Uri? = null,
     val flashMode: FlashMode = FlashMode.OFF,
-    val aspectRatio: AspectRatio = AspectRatio.RATIO_4_3,
+    val aspectRatio: AspectRatio = AspectRatio.RATIO_21_9,
+    val photoAspectRatio: AspectRatio = AspectRatio.RATIO_21_9,
+    val videoAspectRatio: AspectRatio = AspectRatio.RATIO_16_9,
     val gridEnabled: Boolean = true,
     val levelHorizonDegrees: Float = 0f,
+    val deviceCardinalAngle: Int = 0,
+    val isHorizonPlanar: Boolean = false,
     val isProPanelExpanded: Boolean = false,
     val isAgcSheetOpen: Boolean = false,
     val isSettingsSheetOpen: Boolean = false,
+    val isAiSheetOpen: Boolean = false,
     val activeProControl: String? = null,
     val proSettings: ProSettings = ProSettings(),
     val manualSettings: CameraManualSettings = CameraManualSettings(),
@@ -458,6 +565,15 @@ data class GXVcamUiState(
     val isPortraitApertureExpanded: Boolean = false,
     val isMacroLocked: Boolean = false,
     val isAutoNightVisionActive: Boolean = false,
+    val pipelineMetrics: org.gxvcam.camera.PipelineMetrics = org.gxvcam.camera.PipelineMetrics(),
+    val npuTelemetry: org.gxvcam.ai.NpuExecutionTelemetry? = null,
+    val hasPhysicalEvsHardware: Boolean = false,
+    val vevsLiveOutput: org.gxvcam.ai.VirtualEvsOutput? = null,
+    // Sprint 8: Pro Video Cinema Telemetry
+    val audioMeterDbFs: Pair<Float, Float> = -60f to -60f,
+    val availableAudioDevices: List<org.gxvcam.audio.AudioDeviceOption> = emptyList(),
+    val videoCodecCapabilities: org.gxvcam.video.VideoCodecCapabilities = org.gxvcam.video.VideoCodecCapabilities(),
+    val seamlessColorState: org.gxvcam.video.CrossLensColorState = org.gxvcam.video.CrossLensColorState(),
 ) {
     val isAeAfLocked: Boolean get() = isAeLocked && isAfLocked
 }
@@ -491,6 +607,7 @@ sealed interface GXVcamEvent {
     data class SetColorSpace(val colorSpace: ColorSpaceOption) : GXVcamEvent
     data class SetJpegQuality(val quality: Int) : GXVcamEvent
     data object ToggleSettingsSheet : GXVcamEvent
+    data object ToggleAiSettingsSheet : GXVcamEvent
     data class UpdateManualSettings(val settings: CameraManualSettings) : GXVcamEvent
     data object ResetProToAuto : GXVcamEvent
 
@@ -520,6 +637,8 @@ sealed interface GXVcamEvent {
     data class OnHardwareCapabilitiesUpdated(val capabilities: ProHardwareCapabilities) : GXVcamEvent
     data class OnRecordingDurationUpdated(val durationMs: Long) : GXVcamEvent
     data class OnDeviceOrientationChanged(val surfaceRotation: Int, val cardinalAngle: Int) : GXVcamEvent
+    data class UpdateHorizonPlanar(val isPlanar: Boolean) : GXVcamEvent
+    data class OnSelfieFaceCountUpdated(val faceCount: Int) : GXVcamEvent
     data class SetDualCaptureLayout(val layout: DualCaptureLayout) : GXVcamEvent
     data object ToggleDualCaptureSwap : GXVcamEvent
     data class ToggleLiveViewfinderLut(val enabled: Boolean) : GXVcamEvent
@@ -536,4 +655,16 @@ sealed interface GXVcamEvent {
     data class OnVolumeZoomStep(val isZoomIn: Boolean) : GXVcamEvent
     data class OnVolumeZoomHold(val isZoomIn: Boolean) : GXVcamEvent
     data object OnVolumeZoomReleased : GXVcamEvent
+
+    // Sprint 7.1: Virtual EVS (NPU + Light Telemetry) Events
+    data class UpdateHardwareEvsSupport(val hasPhysicalEvs: Boolean) : GXVcamEvent
+    data class UpdateVirtualEvsOutput(val output: org.gxvcam.ai.VirtualEvsOutput?) : GXVcamEvent
+    data object ToggleVirtualEvsSimulation : GXVcamEvent
+
+    // Sprint 8: Pro Video & Cross-Lens Cinema Events
+    data class UpdateAudioMeter(val stereoDbFs: Pair<Float, Float>) : GXVcamEvent
+    data class UpdateAvailableAudioDevices(val devices: List<org.gxvcam.audio.AudioDeviceOption>) : GXVcamEvent
+    data class UpdateVideoCodecCapabilities(val capabilities: org.gxvcam.video.VideoCodecCapabilities) : GXVcamEvent
+    data class UpdateCrossLensColorState(val state: org.gxvcam.video.CrossLensColorState) : GXVcamEvent
+    data class SetZoomScrollHapticsEnabled(val enabled: Boolean) : GXVcamEvent
 }

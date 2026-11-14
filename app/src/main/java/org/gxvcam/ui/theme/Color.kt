@@ -13,3 +13,11 @@ val ShutterInnerCore = Color(0xFFFFFFFF)
 
 val PillBackground = Color(0x99000000)
 val PillSelectedBackground = Color(0xFF323238)
+
+// Nord Theme Palette (Polar Night, Frost, Snow Storm)
+val NordPolarNight0 = Color(0xFF2E3440)
+val NordPolarNight1 = Color(0xFF3B4252)
+val NordPolarNight2 = Color(0xFF434C5E)
+val NordFrostCyan = Color(0xFF88C0D0)
+val NordFrostBlue = Color(0xFF81A1C1)
+val NordSnowStorm = Color(0xFFECEFF4)

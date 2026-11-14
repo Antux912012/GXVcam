@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.camera.camera2.Camera2Config
 import androidx.camera.camera2.internal.Camera2CameraFactory
 import androidx.camera.core.CameraXConfig
+import org.gxvcam.camera.PantoneLutGenerator
 
 /**
  * Exposes the Motorola/MediaTek "aux" cameras to CameraX.
@@ -25,11 +26,23 @@ import androidx.camera.core.CameraXConfig
  */
 class GXVcamApplication : Application(), CameraXConfig.Provider {
 
+    override fun onCreate() {
+        super.onCreate()
+        PantoneLutGenerator.ensureGeneratedAsync(this)
+    }
+
     @SuppressLint("RestrictedApi")
     override fun getCameraXConfig(): CameraXConfig =
         CameraXConfig.Builder.fromConfig(Camera2Config.defaultConfig())
-            .setCameraFactoryProvider { context, threadConfig, limiter, openRetryTimeoutMs ->
-                Camera2CameraFactory(context, threadConfig, limiter, openRetryTimeoutMs).also {
+            .setCameraFactoryProvider { context, threadConfig, limiter, openRetryTimeoutMs, cameraXConfig, streamSpecsCalculator ->
+                Camera2CameraFactory(
+                    context,
+                    threadConfig,
+                    limiter,
+                    openRetryTimeoutMs,
+                    cameraXConfig,
+                    streamSpecsCalculator
+                ).also {
                     exposeHiddenAuxCameras(context, it)
                 }
             }

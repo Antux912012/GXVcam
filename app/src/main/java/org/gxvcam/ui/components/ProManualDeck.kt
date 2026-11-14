@@ -45,40 +45,60 @@ fun ProManualDeck(
     onProSettingChanged: ((ProSettings) -> ProSettings) -> Unit,
     modifier: Modifier = Modifier,
     layoutPosition: ProLayoutPosition = ProLayoutPosition.SIDEBAR_RIGHT,
+    isFocusSupported: Boolean = true,
     isFull: Boolean = false,
 ) {
-    val chips = listOf(
-        ProChipData(
-            id = "EV",
-            label = "EV",
-            value = String.format(Locale.US, "%+.1f", proSettings.evIndex * hardwareCapabilities.evStep),
-            isManual = proSettings.evIndex != 0,
-        ),
-        ProChipData(
-            id = "ISO",
-            label = "ISO",
-            value = if (proSettings.isManualIso) "${proSettings.iso}" else "AUTO",
-            isManual = proSettings.isManualIso,
-        ),
-        ProChipData(
-            id = "S",
-            label = "S",
-            value = formatShutterSpeed(proSettings.shutterSpeedNs, proSettings.isManualShutter),
-            isManual = proSettings.isManualShutter,
-        ),
-        ProChipData(
-            id = "WB",
-            label = "WB",
-            value = if (proSettings.whiteBalanceMode == WhiteBalanceMode.AUTO) "AWB" else "${proSettings.whiteBalanceKelvin}K",
-            isManual = proSettings.whiteBalanceMode != WhiteBalanceMode.AUTO,
-        ),
-        ProChipData(
-            id = "AF",
-            label = "AF",
-            value = if (proSettings.isManualFocus) String.format(Locale.US, "%.1fd", proSettings.focusDistanceDiopters) else "AF-C",
-            isManual = proSettings.isManualFocus,
-        ),
-    )
+    val canManualFocus = isFocusSupported && hardwareCapabilities.minFocusDistanceDiopters > 0f
+    LaunchedEffect(canManualFocus, activeControl) {
+        if (!canManualFocus && activeControl == "AF") {
+            onControlSelected(null)
+        }
+    }
+
+    val chips = buildList {
+        add(
+            ProChipData(
+                id = "EV",
+                label = "EV",
+                value = String.format(Locale.US, "%+.1f", proSettings.evIndex * hardwareCapabilities.evStep),
+                isManual = proSettings.evIndex != 0,
+            )
+        )
+        add(
+            ProChipData(
+                id = "ISO",
+                label = "ISO",
+                value = if (proSettings.isManualIso) "${proSettings.iso}" else "AUTO",
+                isManual = proSettings.isManualIso,
+            )
+        )
+        add(
+            ProChipData(
+                id = "S",
+                label = "S",
+                value = formatShutterSpeed(proSettings.shutterSpeedNs, proSettings.isManualShutter),
+                isManual = proSettings.isManualShutter,
+            )
+        )
+        add(
+            ProChipData(
+                id = "WB",
+                label = "WB",
+                value = if (proSettings.whiteBalanceMode == WhiteBalanceMode.AUTO) "AWB" else "${proSettings.whiteBalanceKelvin}K",
+                isManual = proSettings.whiteBalanceMode != WhiteBalanceMode.AUTO,
+            )
+        )
+        if (canManualFocus) {
+            add(
+                ProChipData(
+                    id = "AF",
+                    label = "AF",
+                    value = if (proSettings.isManualFocus) String.format(Locale.US, "%.1fd", proSettings.focusDistanceDiopters) else "AF-C",
+                    isManual = proSettings.isManualFocus,
+                )
+            )
+        }
+    }
 
     val onResetAll: () -> Unit = {
         onProSettingChanged { s ->
@@ -700,7 +720,7 @@ private fun EvSliderControl(
             onValueChange = {
                 val newIdx = it.roundToInt()
                 if (newIdx != lastIndex) {
-                    tactile.triggerTick()
+                    tactile.triggerScrollTick()
                     lastIndex = newIdx
                     onEvChanged(newIdx)
                 }
@@ -767,7 +787,7 @@ private fun IsoSliderControl(
                 onValueChange = {
                     val newIso = it.roundToInt()
                     if (kotlin.math.abs(newIso - lastIsoStep) >= 50) {
-                        tactile.triggerTick()
+                        tactile.triggerScrollTick()
                         lastIsoStep = newIso
                     }
                     onIsoChanged(newIso, true)
@@ -881,7 +901,7 @@ private fun WhiteBalanceControl(
                 onValueChange = {
                     val newK = it.roundToInt()
                     if (kotlin.math.abs(newK - lastK) >= 100) {
-                        tactile.triggerTick()
+                        tactile.triggerScrollTick()
                         lastK = newK
                     }
                     onWbChanged(WhiteBalanceMode.CUSTOM, newK)
@@ -950,7 +970,7 @@ private fun FocusControl(
                 onValueChange = {
                     val step = (it / maxDistance.coerceAtLeast(0.001f) * 30f).roundToInt()
                     if (step != lastStep) {
-                        tactile.triggerTick()
+                        tactile.triggerScrollTick()
                         lastStep = step
                     }
                     onFocusChanged(it, true)

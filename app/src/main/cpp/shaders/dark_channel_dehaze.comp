@@ -1,0 +1,41 @@
+#version 450
+// Vulkan 1.3 compute: Dark-channel prior backlit glare veil estimation & subtraction.
+// Subtracts up to 35% of atmospheric glare veil when peripheral luma strongly exceeds face luma.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, rgba16f) uniform readonly image2D uLinearIn;
+layout(binding = 1, rgba16f) uniform writeonly image2D uLinearOut;
+
+layout(push_constant) uniform DehazePC {
+    float dehazeStrength; // e.g. 0.35
+    float airlightR;
+    float airlightG;
+    float airlightB;
+} pc;
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 dims = imageSize(uLinearIn);
+    if (gid.x >= dims.x || gid.y >= dims.y) return;
+
+    vec3 center = max(imageLoad(uLinearIn, gid).rgb, vec3(0.0));
+
+    // Estimate local 3x3 dark channel minimum (2-pixel stride approximates wider 64x64 grid veil)
+    float darkMin = min(center.r, min(center.g, center.b));
+    for (int dy = -2; dy <= 2; dy += 2) {
+        for (int dx = -2; dx <= 2; dx += 2) {
+            ivec2 sp = clamp(gid + ivec2(dx, dy), ivec2(0), dims - ivec2(1));
+            vec3 px = max(imageLoad(uLinearIn, sp).rgb, vec3(0.0));
+            darkMin = min(darkMin, min(px.r, min(px.g, px.b)));
+        }
+    }
+
+    vec3 airlight = max(vec3(pc.airlightR, pc.airlightG, pc.airlightB), vec3(1e-3));
+    float normDark = min(darkMin / max(airlight.r, max(airlight.g, airlight.b)), 0.95);
+    float omega = clamp(pc.dehazeStrength, 0.0, 0.45);
+    float transmission = clamp(1.0 - omega * normDark, 0.35, 1.0);
+
+    vec3 recovered = max((center - airlight * (1.0 - transmission)) / transmission, vec3(0.0));
+    imageStore(uLinearOut, gid, vec4(recovered, 1.0));
+}

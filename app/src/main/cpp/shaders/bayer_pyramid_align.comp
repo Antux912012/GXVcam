@@ -1,0 +1,70 @@
+#version 450
+// Vulkan compute: Bayer L1 2x2 downsample + L1 SAD tile block matching for MT6878 Mali-G615 MC2.
+// Matches gxv::BayerPyramidAligner::buildBayerL1Luma & tile alignment semantics.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(std430, binding = 0) readonly buffer RefBayer { float refPx[]; };
+layout(std430, binding = 1) readonly buffer MovBayer { float movPx[]; };
+layout(std430, binding = 2) writeonly buffer TileMotionVectors { ivec2 tileOffsets[]; };
+
+layout(push_constant) uniform AlignPC {
+    uint width;
+    uint height;
+    uint tileSize;
+    uint searchRadius;
+} pc;
+
+float sampleL1(bool isRef, int l1x, int l1y) {
+    int bx = clamp(l1x * 2, 0, int(pc.width) - 2);
+    int by = clamp(l1y * 2, 0, int(pc.height) - 2);
+    uint idx00 = uint(by) * pc.width + uint(bx);
+    uint idx10 = idx00 + 1u;
+    uint idx01 = idx00 + pc.width;
+    uint idx11 = idx01 + 1u;
+    if (isRef) {
+        return 0.25 * (refPx[idx00] + refPx[idx10] + refPx[idx01] + refPx[idx11]);
+    } else {
+        return 0.25 * (movPx[idx00] + movPx[idx10] + movPx[idx01] + movPx[idx11]);
+    }
+}
+
+void main() {
+    uint tx = gl_GlobalInvocationID.x;
+    uint ty = gl_GlobalInvocationID.y;
+    uint l1Tile = max(4u, pc.tileSize / 2u);
+    uint l1W = pc.width / 2u;
+    uint l1H = pc.height / 2u;
+    uint tilesX = (l1W + l1Tile - 1u) / l1Tile;
+    uint tilesY = (l1H + l1Tile - 1u) / l1Tile;
+
+    if (tx >= tilesX || ty >= tilesY) return;
+
+    int startX = int(tx * l1Tile);
+    int startY = int(ty * l1Tile);
+    int endX = min(int(l1W), startX + int(l1Tile));
+    int endY = min(int(l1H), startY + int(l1Tile));
+    int rad = int(pc.searchRadius);
+
+    float bestCost = 1e30;
+    ivec2 bestOff = ivec2(0, 0);
+
+    for (int dy = -rad; dy <= rad; ++dy) {
+        for (int dx = -rad; dx <= rad; ++dx) {
+            float cost = 0.0;
+            for (int y = startY; y < endY; ++y) {
+                for (int x = startX; x < endX; ++x) {
+                    float r = sampleL1(true, x, y);
+                    float m = sampleL1(false, x + dx, y + dy);
+                    cost += abs(r - m);
+                }
+            }
+            if (cost < bestCost) {
+                bestCost = cost;
+                bestOff = ivec2(dx * 2, dy * 2); // Preserve CFA parity
+            }
+        }
+    }
+
+    tileOffsets[ty * tilesX + tx] = bestOff;
+}

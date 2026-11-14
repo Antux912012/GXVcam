@@ -1,0 +1,42 @@
+#version 450
+// Vulkan 1.3 compute: 2x2 Bayer Green-channel average downsample (L0 -> L1/L2/L3 pyramid)
+// for MediaTek Dimensity 7300 / Mali-G615 MC2 coarse-to-fine alignment.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, r16ui) uniform readonly uimage2D uRawBayer;
+layout(binding = 1, r16f) uniform writeonly image2D uGreenL1;
+
+layout(push_constant) uniform DownsamplePC {
+    vec4 blackLevel;   // RGGB black level pattern
+    float whiteLevel;  // e.g. 1023.0 or 4095.0
+    int cfaPattern;    // 0=RGGB, 1=GRBG, 2=GBRG, 3=BGGR
+} pc;
+
+float readNorm(ivec2 p, ivec2 dims) {
+    ivec2 c = clamp(p, ivec2(0), dims - ivec2(1));
+    int idx = (c.y & 1) * 2 + (c.x & 1);
+    float v = float(imageLoad(uRawBayer, c).r);
+    return clamp((v - pc.blackLevel[idx]) / max(pc.whiteLevel - pc.blackLevel[idx], 1.0), 0.0, 1.0);
+}
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 outDims = imageSize(uGreenL1);
+    if (gid.x >= outDims.x || gid.y >= outDims.y) return;
+
+    ivec2 inDims = imageSize(uRawBayer);
+    ivec2 base = gid * 2;
+
+    float p00 = readNorm(base + ivec2(0, 0), inDims);
+    float p10 = readNorm(base + ivec2(1, 0), inDims);
+    float p01 = readNorm(base + ivec2(0, 1), inDims);
+    float p11 = readNorm(base + ivec2(1, 1), inDims);
+
+    // RGGB (0) or BGGR (3): greens are at (1,0) and (0,1); GRBG (1) or GBRG (2): greens at (0,0) and (1,1)
+    float greenAvg = (pc.cfaPattern == 0 || pc.cfaPattern == 3)
+        ? 0.5 * (p10 + p01)
+        : 0.5 * (p00 + p11);
+
+    imageStore(uGreenL1, gid, vec4(greenAvg, 0.0, 0.0, 1.0));
+}

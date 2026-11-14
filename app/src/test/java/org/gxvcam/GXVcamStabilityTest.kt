@@ -6,10 +6,16 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.gxvcam.camera.MotoVideoEngine
+import org.gxvcam.camera.MtkMotoVendorTags
+import org.gxvcam.ui.state.CameraManualSettings
 import org.gxvcam.ui.state.CameraMode
 import org.gxvcam.ui.state.GXVcamEvent
 import org.gxvcam.ui.state.GXVcamViewModel
+import org.gxvcam.ui.state.MotoVideoSettings
 import org.gxvcam.ui.state.OpticalLens
+import org.gxvcam.ui.state.VideoFrameRate
+import org.gxvcam.ui.state.VideoResolution
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -19,7 +25,8 @@ import org.junit.Test
 
 /**
  * Deterministic Stability and Stress Test Suite for GXVcam.
- * Validates rapid lens switching, burst shutter triggers, and concurrency safety.
+ * Validates rapid lens switching, burst shutter triggers, concurrency safety,
+ * HAL vendor tag keys, video bitrate/FPS scaling, and default quality settings.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GXVcamStabilityTest {
@@ -139,5 +146,120 @@ class GXVcamStabilityTest {
         val finalState = viewModel.uiState.value
         assertNotNull(finalState)
         assertTrue(finalState.currentZoomRatio in 0.6f..20.0f)
+    }
+
+    @Test
+    fun testMotoVideoEngine_computesTargetFpsAndBitRate() {
+        val uhdSettings = MotoVideoSettings(
+            resolution = VideoResolution.UHD_4K,
+            frameRate = VideoFrameRate.FPS_60
+        )
+        assertEquals(30, MotoVideoEngine.computeTargetFps(uhdSettings))
+        assertEquals(65_000_000, MotoVideoEngine.computeTargetBitRate(uhdSettings))
+
+        val fhd30 = MotoVideoSettings(
+            resolution = VideoResolution.FHD_1080P,
+            frameRate = VideoFrameRate.FPS_30
+        )
+        assertEquals(30, MotoVideoEngine.computeTargetFps(fhd30))
+        assertEquals(24_000_000, MotoVideoEngine.computeTargetBitRate(fhd30))
+
+        val fhd60 = MotoVideoSettings(
+            resolution = VideoResolution.FHD_1080P,
+            frameRate = VideoFrameRate.FPS_60
+        )
+        assertEquals(60, MotoVideoEngine.computeTargetFps(fhd60))
+        assertEquals(35_000_000, MotoVideoEngine.computeTargetBitRate(fhd60))
+
+        val hd30 = MotoVideoSettings(
+            resolution = VideoResolution.HD_720P,
+            frameRate = VideoFrameRate.FPS_30
+        )
+        assertEquals(12_000_000, MotoVideoEngine.computeTargetBitRate(hd30))
+
+        val hd60 = MotoVideoSettings(
+            resolution = VideoResolution.HD_720P,
+            frameRate = VideoFrameRate.FPS_60
+        )
+        assertEquals(18_000_000, MotoVideoEngine.computeTargetBitRate(hd60))
+
+        val dual4k = MotoVideoSettings(
+            resolution = VideoResolution.UHD_4K,
+            frameRate = VideoFrameRate.FPS_60,
+            isDualCaptureEnabled = true
+        )
+        assertEquals(30, MotoVideoEngine.computeTargetFps(dual4k))
+        assertEquals(24_000_000, MotoVideoEngine.computeTargetBitRate(dual4k))
+    }
+
+    @Test
+    fun testMtkMotoVendorTags_allKeysInstantiateNonNull() {
+        assertNotNull(MtkMotoVendorTags.MTK_ZSL_MODE)
+        assertNotNull(MtkMotoVendorTags.MOTO_IN_SENSOR_CROP_ENABLE)
+        assertNotNull(MtkMotoVendorTags.MOTO_DO_REMOSAIC)
+        assertNotNull(MtkMotoVendorTags.MOTO_ZSL_CROP)
+        assertNotNull(MtkMotoVendorTags.MOTO_IS_MOTCAMERA2)
+        assertNotNull(MtkMotoVendorTags.MOTO_IS_PRO_MODE)
+        assertNotNull(MtkMotoVendorTags.MOTO_CURRENT_MODE)
+        assertNotNull(MtkMotoVendorTags.MOTO_NIGHT_REQUEST)
+        assertNotNull(MtkMotoVendorTags.MTK_3DNR_MODE)
+        assertNotNull(MtkMotoVendorTags.MTK_MFNR_MFB_MODE)
+        assertNotNull(MtkMotoVendorTags.MTK_MFNR_AIS_MODE)
+        assertNotNull(MtkMotoVendorTags.MTK_VIDEO_AINR_MODES)
+        assertNotNull(MtkMotoVendorTags.MOTO_VHDR_STATE)
+        assertNotNull(MtkMotoVendorTags.MOTO_VSTAB_SMARTEIS)
+        assertNotNull(MtkMotoVendorTags.MOTO_VSTAB_IHC)
+        assertNotNull(MtkMotoVendorTags.MOTO_VSTAB_PZS)
+        assertNotNull(MtkMotoVendorTags.MOTO_ADRC_GAIN)
+    }
+
+    @Test
+    fun testCameraManualSettings_defaultJpegQualityIs95() {
+        val defaults = CameraManualSettings()
+        assertEquals(95, defaults.jpegQuality)
+    }
+
+    @Test
+    fun testViennaLensRouter_mapsAllOpticalLensesToCorrectPhysicalSensorIds() {
+        val resolved = mapOf(
+            org.gxvcam.camera.ViennaLensRouter.LensRole.MAIN to "0",
+            org.gxvcam.camera.ViennaLensRouter.LensRole.FRONT to "1",
+            org.gxvcam.camera.ViennaLensRouter.LensRole.ULTRA_WIDE to "2",
+            org.gxvcam.camera.ViennaLensRouter.LensRole.TELE_3X to "3",
+            org.gxvcam.camera.ViennaLensRouter.LensRole.LOGICAL_BACK to "5"
+        )
+        assertEquals("2", org.gxvcam.camera.ViennaLensRouter.cameraIdForOpticalLens(OpticalLens.UW, isBackCamera = true, resolvedIds = resolved))
+        assertEquals("0", org.gxvcam.camera.ViennaLensRouter.cameraIdForOpticalLens(OpticalLens.MAIN_1X, isBackCamera = true, resolvedIds = resolved))
+        assertEquals("0", org.gxvcam.camera.ViennaLensRouter.cameraIdForOpticalLens(OpticalLens.CROP_2X, isBackCamera = true, resolvedIds = resolved))
+        assertEquals("3", org.gxvcam.camera.ViennaLensRouter.cameraIdForOpticalLens(OpticalLens.TELE_3X, isBackCamera = true, resolvedIds = resolved))
+        assertEquals("1", org.gxvcam.camera.ViennaLensRouter.cameraIdForOpticalLens(OpticalLens.MAIN_1X, isBackCamera = false, resolvedIds = resolved))
+    }
+
+    @Test
+    fun testCrossSensorLensSelection_switchesImmediatelyToTargetLens() = runTest(testDispatcher) {
+        // Default is 1.0x MAIN_1X (camera "0")
+        assertEquals(OpticalLens.MAIN_1X, viewModel.uiState.value.activeLens)
+        assertEquals(1.0f, viewModel.uiState.value.currentZoomRatio, 0.01f)
+
+        // Switch to 0.6x UW (camera "2") -> immediate cross-sensor jump without intermediate frames
+        viewModel.onEvent(GXVcamEvent.SelectLens(OpticalLens.UW))
+        assertEquals(OpticalLens.UW, viewModel.uiState.value.activeLens)
+        assertEquals(0.6f, viewModel.uiState.value.currentZoomRatio, 0.01f)
+
+        // Switch to 3.0x TELE_3X (camera "3") -> immediate cross-sensor jump
+        viewModel.onEvent(GXVcamEvent.SelectLens(OpticalLens.TELE_3X))
+        assertEquals(OpticalLens.TELE_3X, viewModel.uiState.value.activeLens)
+        assertEquals(3.0f, viewModel.uiState.value.currentZoomRatio, 0.01f)
+
+        // Switch back to 1.0x MAIN_1X (camera "0") -> immediate cross-sensor jump
+        viewModel.onEvent(GXVcamEvent.SelectLens(OpticalLens.MAIN_1X))
+        assertEquals(OpticalLens.MAIN_1X, viewModel.uiState.value.activeLens)
+        assertEquals(1.0f, viewModel.uiState.value.currentZoomRatio, 0.01f)
+
+        // Switch to 2.0x CROP_2X (same physical camera "0") -> smooth animation completes to 2.0x
+        viewModel.onEvent(GXVcamEvent.SelectLens(OpticalLens.CROP_2X))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(OpticalLens.CROP_2X, viewModel.uiState.value.activeLens)
+        assertEquals(2.0f, viewModel.uiState.value.currentZoomRatio, 0.01f)
     }
 }

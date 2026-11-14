@@ -6,11 +6,18 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+
+/**
+ * CompositionLocal controlling tactile haptic feedback for zoom wheels, rulers, rockers,
+ * and slider / scroll bars across GXVcam.
+ */
+val LocalZoomScrollHapticsEnabled = compositionLocalOf { true }
 
 /**
  * Controller providing Niagara Launcher-style tactile ratchet feedback across UI sliders and wheels.
@@ -20,9 +27,10 @@ class TactileFeedbackController(
     val context: Context,
     val vibrator: Vibrator?,
     val haptic: HapticFeedback,
+    val isZoomScrollHapticsEnabled: Boolean = true,
 ) {
     /**
-     * Niagara Launcher-style crisp tactile ratchet tick for sliders, scrubbers, and dials.
+     * Niagara Launcher-style crisp tactile ratchet tick for buttons and mode actions.
      */
     fun triggerTick() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && vibrator?.hasVibrator() == true) {
@@ -42,10 +50,28 @@ class TactileFeedbackController(
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
+
+    /**
+     * Tactile tick gated by the user's "Zoom & Scroll Bar Haptics" setting.
+     */
+    fun triggerScrollTick() {
+        if (!isZoomScrollHapticsEnabled) return
+        triggerTick()
+    }
+
+    /**
+     * Tactile snap gated by the user's "Zoom & Scroll Bar Haptics" setting.
+     */
+    fun triggerScrollSnap() {
+        if (!isZoomScrollHapticsEnabled) return
+        triggerSnap()
+    }
 }
 
 @Composable
-fun rememberTactileFeedback(): TactileFeedbackController {
+fun rememberTactileFeedback(
+    isZoomScrollHapticsEnabled: Boolean = LocalZoomScrollHapticsEnabled.current
+): TactileFeedbackController {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val vibrator = remember(context) {
@@ -57,7 +83,7 @@ fun rememberTactileFeedback(): TactileFeedbackController {
             context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
     }
-    return remember(context, vibrator, haptic) {
-        TactileFeedbackController(context, vibrator, haptic)
+    return remember(context, vibrator, haptic, isZoomScrollHapticsEnabled) {
+        TactileFeedbackController(context, vibrator, haptic, isZoomScrollHapticsEnabled)
     }
 }

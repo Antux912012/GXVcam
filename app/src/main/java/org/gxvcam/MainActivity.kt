@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.view.KeyEvent
 import androidx.activity.viewModels
 import org.gxvcam.camera.GXVcamController
+import org.gxvcam.data.GXVcamPreferencesRepository
+import org.gxvcam.sensors.GyroMotionTracker
 import org.gxvcam.sensors.HorizonSensorManager
 import org.gxvcam.ui.GXVcamScreen
 import org.gxvcam.ui.state.GXVcamEvent
@@ -36,11 +38,25 @@ class MainActivity : ComponentActivity() {
 
     private val gxvViewModel: GXVcamViewModel by viewModels()
     private lateinit var cameraController: GXVcamController
+    private lateinit var gyroMotionTracker: GyroMotionTracker
 
     private val requiredPermissions = arrayOf(
         Manifest.permission.CAMERA,
         Manifest.permission.RECORD_AUDIO,
     )
+
+    private val mediaReadPermissions: Array<String>
+        get() = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+            )
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+
+    private val launchPermissions: Array<String>
+        get() = requiredPermissions + mediaReadPermissions
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -52,6 +68,11 @@ class MainActivity : ComponentActivity() {
         setTurnScreenOn(true)
 
         cameraController = GXVcamController(applicationContext, lifecycleOwner = this)
+        gyroMotionTracker = GyroMotionTracker(applicationContext)
+        cameraController.gyroMotionTracker = gyroMotionTracker
+
+        val preferencesRepository = GXVcamPreferencesRepository(applicationContext)
+        gxvViewModel.attachPreferencesRepository(preferencesRepository)
 
         setContent {
             val uiState by gxvViewModel.uiState.collectAsStateWithLifecycle()
@@ -63,8 +84,23 @@ class MainActivity : ComponentActivity() {
 
                 val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions(),
-                ) { permissions ->
-                    hasPermissions = permissions.values.all { it }
+                ) { _ ->
+                    hasPermissions = allPermissionsGranted()
+                    if (hasPermissions) {
+                        refreshLatestMediaThumbnail()
+                    }
+                }
+
+                LaunchedEffect(hasPermissions) {
+                    if (hasPermissions) {
+                        val missingMedia = mediaReadPermissions.any {
+                            ContextCompat.checkSelfPermission(baseContext, it) != PackageManager.PERMISSION_GRANTED
+                        }
+                        if (missingMedia) {
+                            permissionLauncher.launch(mediaReadPermissions)
+                        }
+                        refreshLatestMediaThumbnail()
+                    }
                 }
 
                 if (hasPermissions) {
@@ -78,6 +114,9 @@ class MainActivity : ComponentActivity() {
                             onOrientationChanged = { cardinalAngle, surfaceRotation ->
                                 cameraController.updateDeviceOrientation(surfaceRotation, cardinalAngle)
                                 gxvViewModel.onEvent(GXVcamEvent.OnDeviceOrientationChanged(surfaceRotation, cardinalAngle))
+                            },
+                            onPlanarChanged = { planar ->
+                                gxvViewModel.onEvent(GXVcamEvent.UpdateHorizonPlanar(planar))
                             }
                         )
                     }
@@ -86,8 +125,18 @@ class MainActivity : ComponentActivity() {
                     DisposableEffect(lifecycleOwner) {
                         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                             when (event) {
-                                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> horizonSensorManager.start()
-                                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> horizonSensorManager.stop()
+                                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                                    horizonSensorManager.start()
+                                    gyroMotionTracker.stop()
+                                    cameraController.virtualEvsSimulator.stop()
+                                    refreshLatestMediaThumbnail()
+                                }
+                                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                                    horizonSensorManager.stop()
+                                    gyroMotionTracker.stop()
+                                    cameraController.virtualEvsSimulator.stop()
+                                    cameraController.proAudioInputRouter.stopMonitoring()
+                                }
                                 else -> {}
                             }
                         }
@@ -95,6 +144,8 @@ class MainActivity : ComponentActivity() {
                         onDispose {
                             lifecycleOwner.lifecycle.removeObserver(observer)
                             horizonSensorManager.stop()
+                            gyroMotionTracker.stop()
+                            cameraController.virtualEvsSimulator.stop()
                         }
                     }
 
@@ -104,13 +155,13 @@ class MainActivity : ComponentActivity() {
                         viewfinderContent = {
                             AndroidView(
                                 factory = { _ ->
-                                    val pv = cameraController.previewView
-                                    (pv.parent as? android.view.ViewGroup)?.removeView(pv)
-                                    pv.also {
+                                    val container = cameraController.viewfinderContainer
+                                    (container.parent as? android.view.ViewGroup)?.removeView(container)
+                                    container.also {
                                         gxvViewModel.attachController(
                                             controller = cameraController,
                                             lifecycleOwner = this@MainActivity,
-                                            surfaceProvider = it.surfaceProvider,
+                                            surfaceProvider = cameraController.previewView.surfaceProvider,
                                         )
                                     }
                                 },
@@ -130,18 +181,96 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     PermissionRequestScreen {
-                        permissionLauncher.launch(requiredPermissions)
+                        permissionLauncher.launch(launchPermissions)
                     }
                 }
             }
         }
     }
 
+    private fun refreshLatestMediaThumbnail() {
+        val hasMediaAccess = mediaReadPermissions.any {
+            ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (!hasMediaAccess) return
+
+        Thread {
+            val uri = queryLatestMediaUri()
+            if (uri != null) {
+                runOnUiThread {
+                    gxvViewModel.onEvent(GXVcamEvent.OnPhotoCaptured(uri))
+                }
+            }
+        }.start()
+    }
+
+    private fun queryLatestMediaUri(): android.net.Uri? {
+        val projection = arrayOf(
+            android.provider.MediaStore.MediaColumns._ID,
+            android.provider.MediaStore.MediaColumns.DATE_ADDED
+        )
+        val candidates = mutableListOf<Pair<android.net.Uri, Long>>()
+
+        fun queryUri(baseUri: android.net.Uri, selection: String?, args: Array<String>?): Pair<android.net.Uri, Long>? {
+            return runCatching {
+                contentResolver.query(
+                    baseUri,
+                    projection,
+                    selection,
+                    args,
+                    "${android.provider.MediaStore.MediaColumns.DATE_ADDED} DESC"
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(android.provider.MediaStore.MediaColumns._ID))
+                        val date = cursor.getLong(cursor.getColumnIndexOrThrow(android.provider.MediaStore.MediaColumns.DATE_ADDED))
+                        android.content.ContentUris.withAppendedId(baseUri, id) to date
+                    } else null
+                }
+            }.getOrNull()
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            queryUri(
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                "${android.provider.MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+                arrayOf("%DCIM/GXVcam%")
+            )?.let { candidates.add(it) }
+            queryUri(
+                android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                "${android.provider.MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+                arrayOf("%DCIM/GXVcam%")
+            )?.let { candidates.add(it) }
+        }
+
+        if (candidates.isEmpty()) {
+            queryUri(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null, null)?.let { candidates.add(it) }
+            queryUri(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, null, null)?.let { candidates.add(it) }
+        }
+
+        return candidates.maxByOrNull { it.second }?.first
+    }
+
     private fun openGallery(lastCapturedUri: android.net.Uri? = null) {
-        if (lastCapturedUri != null) {
+        val photosPkg = "com.google.android.apps.photos"
+        val targetUri = lastCapturedUri ?: queryLatestMediaUri()
+        if (targetUri != null) {
+            val mimeType = runCatching { contentResolver.getType(targetUri) }.getOrNull() ?: "image/*"
+            // 1. Prefer Google Photos viewing the exact captured photo or video
+            try {
+                val photosIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(targetUri, mimeType)
+                    setPackage(photosPkg)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(photosIntent)
+                return
+            } catch (_: Exception) {}
+
+            // 2. Fallback to any system viewer for that URI
             try {
                 val intent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(lastCapturedUri, "image/*")
+                    setDataAndType(targetUri, mimeType)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -150,6 +279,18 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {}
         }
 
+        // 3. Open Google Photos app directly if no URI yet or viewer failed
+        try {
+            val launchPhotos = packageManager.getLaunchIntentForPackage(photosPkg)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (launchPhotos != null) {
+                startActivity(launchPhotos)
+                return
+            }
+        } catch (_: Exception) {}
+
+        // 4. Generic gallery fallback
         try {
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 type = "image/*"
@@ -186,7 +327,16 @@ class MainActivity : ComponentActivity() {
                 }
                 VolumeKeyAction.SHUTTER -> {
                     if (event?.repeatCount == 0) {
-                        gxvViewModel.onEvent(GXVcamEvent.OnShutterClicked)
+                        val state = gxvViewModel.uiState.value
+                        if (state.currentMode == org.gxvcam.ui.state.CameraMode.VIDEO) {
+                            if (state.isRecording) {
+                                gxvViewModel.onEvent(GXVcamEvent.OnStopRecording)
+                            } else {
+                                gxvViewModel.onEvent(GXVcamEvent.OnStartRecording)
+                            }
+                        } else {
+                            gxvViewModel.onEvent(GXVcamEvent.OnShutterClicked)
+                        }
                     }
                     return true
                 }

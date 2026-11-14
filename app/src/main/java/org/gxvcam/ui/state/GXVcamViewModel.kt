@@ -4,6 +4,7 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.gxvcam.camera.GXVcamController
+import org.gxvcam.camera.PipelineTelemetry
+import org.gxvcam.data.GXVcamPreferencesRepository
+import org.gxvcam.video.GxvVideoCodecManager
 import kotlin.math.roundToInt
 
 class GXVcamViewModel : ViewModel() {
@@ -21,10 +25,107 @@ class GXVcamViewModel : ViewModel() {
     val uiState: StateFlow<GXVcamUiState> = _uiState.asStateFlow()
 
     private var recordingTimerJob: Job? = null
+    private var prefsCollectorJob: Job? = null
+    private var audioMeterCollectorJob: Job? = null
+    private var audioDevicesCollectorJob: Job? = null
+    private var preferencesRepository: GXVcamPreferencesRepository? = null
 
     private var controller: GXVcamController? = null
     private var lifecycleOwner: LifecycleOwner? = null
     private var surfaceProvider: Preview.SurfaceProvider? = null
+
+    init {
+        viewModelScope.launch {
+            PipelineTelemetry.metrics.collect { metrics ->
+                _uiState.update {
+                    it.copy(
+                        pipelineMetrics = metrics,
+                        npuTelemetry = metrics.npuTelemetry ?: it.npuTelemetry
+                    )
+                }
+            }
+        }
+    }
+
+    fun attachPreferencesRepository(repository: GXVcamPreferencesRepository) {
+        if (this.preferencesRepository === repository) return
+        this.preferencesRepository = repository
+        prefsCollectorJob?.cancel()
+        prefsCollectorJob = viewModelScope.launch {
+            repository.preferencesFlow.collect { snapshot ->
+                val p = snapshot.colorProfile
+                val v = snapshot.videoSettings
+                _uiState.update { state ->
+                    val mergedVideo = state.motoVideoSettings.copy(
+                        isProVideoEngineEnabled = v.isProVideoEngineEnabled,
+                        codecProfile = v.codecProfile,
+                        colorProfile = v.colorProfile,
+                        isHdr10BitEnabled = (v.colorProfile == VideoColorProfile.HLG_HDR10),
+                        isShutter180Locked = v.isShutter180Locked,
+                        audioInputSource = v.audioInputSource,
+                        isWindNoiseCutEnabled = v.isWindNoiseCutEnabled,
+                        activeLutStyle = v.activeLutStyle,
+                        lutBlend = v.lutBlend,
+                        vibrance = v.vibrance
+                    )
+                    state.copy(
+                        manualSettings = snapshot.manualSettings,
+                        gridEnabled = snapshot.manualSettings.gridType != GridType.NONE,
+                        motoVideoSettings = mergedVideo,
+                        agcSettings = state.agcSettings.copy(
+                            activeProfile = p,
+                            saturation = p.saturationBoost,
+                            contrast = p.contrastCurve,
+                            highlightKnee = p.highlightKnee,
+                            shadowLift = p.shadowLift,
+                            sharpnessLevel = p.acutance,
+                            vignetteStrength = p.vignetteStrength
+                        )
+                    )
+                }
+                controller?.applyManualSettings(snapshot.manualSettings)
+                if (_uiState.value.currentMode == CameraMode.VIDEO) {
+                    controller?.applyMotoVideoSettings(
+                        settings = _uiState.value.motoVideoSettings,
+                        zoomRatio = _uiState.value.currentZoomRatio,
+                        rollDegrees = _uiState.value.levelHorizonDegrees
+                    )
+                }
+            }
+        }
+    }
+
+    private fun persistManualSettings(settings: CameraManualSettings) {
+        val repo = preferencesRepository ?: return
+        viewModelScope.launch {
+            repo.saveManualSettings(settings)
+        }
+    }
+
+    private fun persistColorProfile(profile: AgcColorProfile) {
+        val repo = preferencesRepository ?: return
+        viewModelScope.launch {
+            repo.saveColorProfile(profile)
+        }
+    }
+
+    private fun persistVideoSettings(settings: MotoVideoSettings) {
+        val repo = preferencesRepository ?: return
+        viewModelScope.launch {
+            repo.saveVideoSettings(settings)
+        }
+    }
+
+    fun onSelfieFacesDetected(faceCount: Int) {
+        val state = _uiState.value
+        if (!state.isBackCamera &&
+            state.manualSettings.isAutoGroupSelfieEnabled &&
+            faceCount >= 2 &&
+            state.currentZoomRatio > 1.05f
+        ) {
+            smoothAnimateZoomTo(1.0f)
+        }
+    }
 
     fun attachController(
         controller: GXVcamController,
@@ -47,8 +148,28 @@ class GXVcamViewModel : ViewModel() {
 
         // Re-sync state that survives in the ViewModel when a new controller is attached
         // (e.g. after Activity recreation), so captures keep the user's watermark/bokeh choices.
+        _uiState.update {
+            it.copy(hasPhysicalEvsHardware = controller.virtualEvsSimulator.hasPhysicalEvsHardware)
+        }
         controller.portraitAperture = _uiState.value.portraitAperture
         controller.applyManualSettings(_uiState.value.manualSettings)
+
+        audioMeterCollectorJob?.cancel()
+        audioMeterCollectorJob = viewModelScope.launch {
+            controller.proAudioInputRouter.stereoDbFs.collect { db ->
+                _uiState.update { it.copy(audioMeterDbFs = db) }
+            }
+        }
+        audioDevicesCollectorJob?.cancel()
+        audioDevicesCollectorJob = viewModelScope.launch {
+            controller.proAudioInputRouter.availableDevices.collect { devices ->
+                _uiState.update { it.copy(availableAudioDevices = devices) }
+            }
+        }
+        viewModelScope.launch(Dispatchers.Default) {
+            val caps = GxvVideoCodecManager.probeCapabilities()
+            _uiState.update { it.copy(videoCodecCapabilities = caps) }
+        }
 
         rebindCamera()
     }
@@ -118,12 +239,14 @@ class GXVcamViewModel : ViewModel() {
             is GXVcamEvent.OnCycleAspectRatio -> handleCycleAspectRatio()
 
             is GXVcamEvent.SetGridType -> {
+                val updated = _uiState.value.manualSettings.copy(gridType = event.gridType)
                 _uiState.update {
                     it.copy(
-                        manualSettings = it.manualSettings.copy(gridType = event.gridType),
+                        manualSettings = updated,
                         gridEnabled = (event.gridType != GridType.NONE)
                     )
                 }
+                persistManualSettings(updated)
             }
             is GXVcamEvent.ToggleGrid,
             is GXVcamEvent.OnToggleGrid -> {
@@ -135,12 +258,14 @@ class GXVcamViewModel : ViewModel() {
                     GridType.GOLDEN_RATIO -> GridType.CROSSHAIR
                     GridType.CROSSHAIR -> GridType.NONE
                 }
+                val updated = _uiState.value.manualSettings.copy(gridType = next)
                 _uiState.update {
                     it.copy(
-                        manualSettings = it.manualSettings.copy(gridType = next),
+                        manualSettings = updated,
                         gridEnabled = (next != GridType.NONE)
                     )
                 }
+                persistManualSettings(updated)
             }
 
             is GXVcamEvent.UpdateProSettings -> {
@@ -170,10 +295,14 @@ class GXVcamViewModel : ViewModel() {
             }
 
             is GXVcamEvent.UpdateHorizonLevel -> {
-                _uiState.update { it.copy(levelHorizonDegrees = event.degrees) }
+                if (kotlin.math.abs(event.degrees - _uiState.value.levelHorizonDegrees) >= 0.15f) {
+                    _uiState.update { it.copy(levelHorizonDegrees = event.degrees) }
+                }
             }
             is GXVcamEvent.OnLevelHorizonUpdated -> {
-                _uiState.update { it.copy(levelHorizonDegrees = event.degrees) }
+                if (kotlin.math.abs(event.degrees - _uiState.value.levelHorizonDegrees) >= 0.15f) {
+                    _uiState.update { it.copy(levelHorizonDegrees = event.degrees) }
+                }
             }
 
             is GXVcamEvent.OnPhotoCaptured -> {
@@ -201,37 +330,45 @@ class GXVcamViewModel : ViewModel() {
                     CaptureFormat.RAW -> CaptureFormat.RAW_AND_JPEG
                     CaptureFormat.RAW_AND_JPEG -> CaptureFormat.JPEG
                 }
+                val updated = _uiState.value.manualSettings.copy(captureFormat = next, isRawAndJpegEnabled = next.isRaw)
                 _uiState.update {
                     it.copy(
-                        manualSettings = it.manualSettings.copy(captureFormat = next, isRawAndJpegEnabled = next.isRaw),
+                        manualSettings = updated,
                         proSettings = it.proSettings.copy(captureFormat = next, isRawAndJpegEnabled = next.isRaw)
                     )
                 }
-                controller?.applyManualSettings(_uiState.value.manualSettings)
+                controller?.applyManualSettings(updated)
+                persistManualSettings(updated)
             }
 
             is GXVcamEvent.SetCaptureFormat -> {
+                val updated = _uiState.value.manualSettings.copy(captureFormat = event.format, isRawAndJpegEnabled = event.format.isRaw)
                 _uiState.update {
                     it.copy(
-                        manualSettings = it.manualSettings.copy(captureFormat = event.format, isRawAndJpegEnabled = event.format.isRaw),
+                        manualSettings = updated,
                         proSettings = it.proSettings.copy(captureFormat = event.format, isRawAndJpegEnabled = event.format.isRaw)
                     )
                 }
-                controller?.applyManualSettings(_uiState.value.manualSettings)
+                controller?.applyManualSettings(updated)
+                persistManualSettings(updated)
             }
 
             is GXVcamEvent.SetColorSpace -> {
+                val updated = _uiState.value.manualSettings.copy(colorSpace = event.colorSpace)
                 _uiState.update {
-                    it.copy(manualSettings = it.manualSettings.copy(colorSpace = event.colorSpace))
+                    it.copy(manualSettings = updated)
                 }
-                controller?.applyManualSettings(_uiState.value.manualSettings)
+                controller?.applyManualSettings(updated)
+                persistManualSettings(updated)
             }
 
             is GXVcamEvent.SetJpegQuality -> {
+                val updated = _uiState.value.manualSettings.copy(jpegQuality = event.quality.coerceIn(50, 100))
                 _uiState.update {
-                    it.copy(manualSettings = it.manualSettings.copy(jpegQuality = event.quality.coerceIn(50, 100)))
+                    it.copy(manualSettings = updated)
                 }
-                controller?.applyManualSettings(_uiState.value.manualSettings)
+                controller?.applyManualSettings(updated)
+                persistManualSettings(updated)
             }
 
             is GXVcamEvent.OnTapToFocus -> {
@@ -345,19 +482,33 @@ class GXVcamViewModel : ViewModel() {
             }
 
             is GXVcamEvent.OnDeviceOrientationChanged -> {
+                _uiState.update { it.copy(deviceCardinalAngle = event.cardinalAngle) }
                 controller?.updateDeviceOrientation(event.surfaceRotation, event.cardinalAngle)
+            }
+
+            is GXVcamEvent.UpdateHorizonPlanar -> {
+                _uiState.update { it.copy(isHorizonPlanar = event.isPlanar) }
+            }
+
+            is GXVcamEvent.OnSelfieFaceCountUpdated -> {
+                onSelfieFacesDetected(event.faceCount)
             }
 
             is GXVcamEvent.UpdateMotoVideoSettings -> {
                 val prevDual = _uiState.value.motoVideoSettings.isDualCaptureEnabled
                 val prevSwap = _uiState.value.motoVideoSettings.isDualCaptureSwapped
+                val prevEngine = _uiState.value.motoVideoSettings.isProVideoEngineEnabled
                 _uiState.update { it.copy(motoVideoSettings = event.settings) }
+                persistVideoSettings(event.settings)
                 controller?.applyMotoVideoSettings(
                     settings = event.settings,
                     zoomRatio = _uiState.value.currentZoomRatio,
                     rollDegrees = _uiState.value.levelHorizonDegrees
                 )
-                if (event.settings.isDualCaptureEnabled != prevDual || event.settings.isDualCaptureSwapped != prevSwap) {
+                if (event.settings.isDualCaptureEnabled != prevDual ||
+                    event.settings.isDualCaptureSwapped != prevSwap ||
+                    event.settings.isProVideoEngineEnabled != prevEngine
+                ) {
                     rebindCamera()
                 }
             }
@@ -385,8 +536,18 @@ class GXVcamViewModel : ViewModel() {
             }
 
             is GXVcamEvent.UpdateAgcSettings -> {
-                _uiState.update { it.copy(agcSettings = event.settings) }
+                val syncedManual = _uiState.value.manualSettings.copy(
+                    hdrFrameCount = event.settings.hdrFrameCount.coerceIn(2, 14)
+                )
+                _uiState.update {
+                    it.copy(
+                        agcSettings = event.settings,
+                        manualSettings = syncedManual
+                    )
+                }
                 controller?.applyAgcSettings(event.settings, _uiState.value.activeLens)
+                controller?.applyManualSettings(syncedManual)
+                persistManualSettings(syncedManual)
             }
 
             is GXVcamEvent.SelectAgcProfile -> {
@@ -405,6 +566,7 @@ class GXVcamViewModel : ViewModel() {
                 )
                 _uiState.update { it.copy(agcSettings = newSettings) }
                 controller?.applyAgcSettings(newSettings, _uiState.value.activeLens)
+                persistColorProfile(p)
             }
 
             is GXVcamEvent.ToggleLiveViewfinderLut -> {
@@ -445,9 +607,61 @@ class GXVcamViewModel : ViewModel() {
                 _uiState.update { it.copy(isSettingsSheetOpen = !it.isSettingsSheetOpen) }
             }
 
+            is GXVcamEvent.ToggleAiSettingsSheet -> {
+                _uiState.update { it.copy(isAiSheetOpen = !it.isAiSheetOpen) }
+            }
+
             is GXVcamEvent.UpdateManualSettings -> {
-                _uiState.update { it.copy(manualSettings = event.settings) }
-                controller?.applyManualSettings(event.settings)
+                val prev = _uiState.value.manualSettings
+                val prevBackend = prev.aiBackend
+                val sanitized = event.settings.copy(
+                    isSignature27PipelineEnabled = false,
+                    isSyntheticEvsDeblurEnabled = false,
+                    isVirtualEvsOverlayVisible = false
+                )
+                val syncedAgc = _uiState.value.agcSettings.copy(
+                    hdrFrameCount = sanitized.hdrFrameCount.coerceIn(2, 14)
+                )
+                _uiState.update {
+                    it.copy(
+                        manualSettings = sanitized,
+                        agcSettings = syncedAgc,
+                        gridEnabled = sanitized.gridType != GridType.NONE,
+                        vevsLiveOutput = null
+                    )
+                }
+                controller?.applyManualSettings(sanitized)
+                controller?.applyAgcSettings(syncedAgc, _uiState.value.activeLens)
+                persistManualSettings(sanitized)
+                if (sanitized.aiBackend != prevBackend &&
+                    _uiState.value.currentMode != CameraMode.PRO &&
+                    _uiState.value.currentMode != CameraMode.VIDEO
+                ) {
+                    rebindCamera()
+                }
+            }
+
+            is GXVcamEvent.UpdateHardwareEvsSupport -> {
+                _uiState.update { it.copy(hasPhysicalEvsHardware = false) }
+            }
+
+            is GXVcamEvent.UpdateVirtualEvsOutput -> {
+                _uiState.update { it.copy(vevsLiveOutput = null) }
+            }
+
+            is GXVcamEvent.ToggleVirtualEvsSimulation -> {
+                val updated = _uiState.value.manualSettings.copy(
+                    isSyntheticEvsDeblurEnabled = false,
+                    isVirtualEvsOverlayVisible = false
+                )
+                _uiState.update {
+                    it.copy(
+                        manualSettings = updated,
+                        vevsLiveOutput = null
+                    )
+                }
+                controller?.applyManualSettings(updated)
+                persistManualSettings(updated)
             }
 
             is GXVcamEvent.ResetProToAuto -> {
@@ -461,7 +675,7 @@ class GXVcamViewModel : ViewModel() {
             is GXVcamEvent.SelectPortraitLens -> {
                 val pLens = event.lens
                 _uiState.update { it.copy(activePortraitLens = pLens) }
-                handleZoomChanged(pLens.zoomRatio)
+                switchLensOrAnimateZoom(OpticalLens.forZoom(pLens.zoomRatio), pLens.zoomRatio)
             }
 
             is GXVcamEvent.SetPortraitAperture -> {
@@ -477,9 +691,9 @@ class GXVcamViewModel : ViewModel() {
                 val newLock = !_uiState.value.isMacroLocked
                 _uiState.update { it.copy(isMacroLocked = newLock) }
                 if (newLock) {
-                    handleZoomChanged(OpticalLens.UW.zoomRatio)
+                    switchLensOrAnimateZoom(OpticalLens.UW, OpticalLens.UW.zoomRatio)
                 } else {
-                    handleZoomChanged(1.0f)
+                    switchLensOrAnimateZoom(OpticalLens.MAIN_1X, 1.0f)
                 }
             }
 
@@ -489,6 +703,29 @@ class GXVcamViewModel : ViewModel() {
                 if (_uiState.value.currentMode == CameraMode.PHOTO) {
                     rebindCamera()
                 }
+            }
+
+            is GXVcamEvent.UpdateAudioMeter -> {
+                _uiState.update { it.copy(audioMeterDbFs = event.stereoDbFs) }
+            }
+
+            is GXVcamEvent.UpdateAvailableAudioDevices -> {
+                _uiState.update { it.copy(availableAudioDevices = event.devices) }
+            }
+
+            is GXVcamEvent.UpdateVideoCodecCapabilities -> {
+                _uiState.update { it.copy(videoCodecCapabilities = event.capabilities) }
+            }
+
+            is GXVcamEvent.UpdateCrossLensColorState -> {
+                _uiState.update { it.copy(seamlessColorState = event.state) }
+            }
+
+            is GXVcamEvent.SetZoomScrollHapticsEnabled -> {
+                val updated = _uiState.value.manualSettings.copy(isZoomScrollHapticsEnabled = event.enabled)
+                _uiState.update { it.copy(manualSettings = updated) }
+                controller?.applyManualSettings(updated)
+                persistManualSettings(updated)
             }
         }
     }
@@ -501,18 +738,22 @@ class GXVcamViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     currentMode = mode,
+                    aspectRatio = it.photoAspectRatio,
                     activeLens = optLens,
                     currentZoomRatio = pLens.zoomRatio,
                     isProPanelExpanded = false,
                     isMacroLocked = false,
+                    audioMeterDbFs = -60f to -60f,
                 )
             }
         } else {
             _uiState.update {
                 it.copy(
                     currentMode = mode,
+                    aspectRatio = if (mode == CameraMode.VIDEO) it.videoAspectRatio else it.photoAspectRatio,
                     isProPanelExpanded = mode == CameraMode.PRO,
                     isMacroLocked = mode == previousMode && it.isMacroLocked,
+                    audioMeterDbFs = if (mode == CameraMode.VIDEO) it.audioMeterDbFs else (-60f to -60f),
                 )
             }
         }
@@ -534,7 +775,30 @@ class GXVcamViewModel : ViewModel() {
                 isMacroLocked = false
             )
         }
-        smoothAnimateZoomTo(lens.zoomRatio)
+        switchLensOrAnimateZoom(lens, lens.zoomRatio)
+    }
+
+    private fun switchLensOrAnimateZoom(targetLens: OpticalLens, targetZoom: Float) {
+        val state = _uiState.value
+        val isBack = state.isBackCamera
+        val minZoom = if (isBack) OpticalLens.MIN_ZOOM else 1.0f
+        val maxZoom = if (isBack) OpticalLens.MAX_ZOOM else 4.0f
+        val clampedZoom = targetZoom.coerceIn(minZoom, maxZoom)
+        val crossSensorSwitch = isBack && (targetLens.cameraId != state.activeLens.cameraId)
+
+        if (crossSensorSwitch && !state.isRecording) {
+            zoomAnimationJob?.cancel()
+            volumeZoomJob?.cancel()
+            _uiState.update {
+                it.copy(
+                    currentZoomRatio = clampedZoom,
+                    activeLens = targetLens
+                )
+            }
+            controller?.setLens(targetLens, clampedZoom)
+        } else {
+            smoothAnimateZoomTo(clampedZoom)
+        }
     }
 
     private fun handleZoomChanged(zoom: Float) {
@@ -678,7 +942,6 @@ class GXVcamViewModel : ViewModel() {
             activeLens = OpticalLens.MAIN_1X,
             displayZoom = 1.0f
         )
-        controller?.setZoom(1.0f)
     }
 
     private fun handleCycleFlash() {
@@ -694,13 +957,20 @@ class GXVcamViewModel : ViewModel() {
 
     private fun handleCycleAspectRatio() {
         val next = when (_uiState.value.aspectRatio) {
-            AspectRatio.RATIO_4_3 -> AspectRatio.RATIO_16_9
-            AspectRatio.RATIO_16_9 -> AspectRatio.RATIO_1_1
+            AspectRatio.RATIO_21_9 -> AspectRatio.RATIO_16_9
+            AspectRatio.RATIO_16_9 -> AspectRatio.RATIO_4_3
+            AspectRatio.RATIO_4_3 -> AspectRatio.RATIO_1_1
             AspectRatio.RATIO_1_1 -> AspectRatio.RATIO_3_2
             AspectRatio.RATIO_3_2 -> AspectRatio.RATIO_21_9
-            AspectRatio.RATIO_21_9 -> AspectRatio.RATIO_4_3
         }
-        _uiState.update { it.copy(aspectRatio = next) }
+        val isVideo = _uiState.value.currentMode == CameraMode.VIDEO
+        _uiState.update {
+            it.copy(
+                aspectRatio = next,
+                videoAspectRatio = if (isVideo) next else it.videoAspectRatio,
+                photoAspectRatio = if (!isVideo) next else it.photoAspectRatio,
+            )
+        }
         rebindCamera(aspectRatio = next)
     }
 
@@ -730,6 +1000,7 @@ class GXVcamViewModel : ViewModel() {
             displayZoom = displayZoom,
             isDualCapture = (isVideo || mode == CameraMode.PHOTO) && _uiState.value.motoVideoSettings.isDualCaptureEnabled,
             isDualCaptureSwapped = _uiState.value.motoVideoSettings.isDualCaptureSwapped,
+            enableVevsAnalysis = false,
         )
     }
 }

@@ -16,6 +16,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -37,8 +39,11 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -343,62 +348,93 @@ fun ExpressiveModeCarousel(
     }
 
     val listState = rememberLazyListState()
+    var containerCenterX by remember { mutableFloatStateOf(0f) }
+    val itemCentersX = remember { mutableStateMapOf<CameraMode, Float>() }
+    var hasCenteredOnce by remember { mutableStateOf(false) }
 
-    // Keep active mode scrolled into view
+    // Keep active mode pill centered pixel-accurately above the shutter button
     val activeIndex = modes.indexOf(currentMode)
-    LaunchedEffect(activeIndex) {
-        if (activeIndex >= 0) {
-            listState.animateScrollToItem(
-                index = activeIndex,
-                scrollOffset = -150
-            )
+    LaunchedEffect(activeIndex, containerCenterX) {
+        if (activeIndex >= 0 && containerCenterX > 0f) {
+            if (itemCentersX[currentMode] == null) {
+                listState.scrollToItem(index = activeIndex, scrollOffset = 0)
+                withFrameNanos { }
+            }
+            val itemCenter = itemCentersX[currentMode]
+            if (itemCenter != null) {
+                val delta = itemCenter - containerCenterX
+                if (kotlin.math.abs(delta) > 1.0f) {
+                    if (!hasCenteredOnce) {
+                        listState.scrollBy(delta)
+                    } else {
+                        listState.animateScrollBy(delta, GXVMotion.spatialSmooth())
+                    }
+                }
+                hasCenteredOnce = true
+            }
         }
     }
 
-    LazyRow(
-        state = listState,
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-        contentPadding = PaddingValues(horizontal = 24.dp)
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { coords ->
+                containerCenterX = coords.positionInRoot().x + coords.size.width / 2f
+            },
+        contentAlignment = Alignment.Center
     ) {
-        items(modes, key = { it.name }) { mode ->
-            val isSelected = mode == currentMode
+        val sidePadding = (maxWidth / 2).coerceAtLeast(24.dp)
 
-            val textScale by animateFloatAsState(
-                targetValue = if (isSelected) 1.05f else 0.95f,
-                animationSpec = GXVMotion.spatialBouncy(),
-                label = "modeTextScale"
-            )
+        LazyRow(
+            state = listState,
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            contentPadding = PaddingValues(horizontal = sidePadding)
+        ) {
+            items(modes, key = { it.name }) { mode ->
+                val isSelected = mode == currentMode
 
-            val containerColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                animationSpec = GXVMotion.fastEffects(),
-                label = "modeContainerColor"
-            )
-
-            val contentColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color.White.copy(alpha = 0.65f),
-                animationSpec = GXVMotion.fastEffects(),
-                label = "modeContentColor"
-            )
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(containerColor)
-                    .clickable { onModeSelected(mode) }
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = mode.name,
-                    color = contentColor,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 13.sp,
-                    letterSpacing = 0.5.sp,
-                    modifier = Modifier.scale(textScale)
+                val textScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.05f else 0.95f,
+                    animationSpec = GXVMotion.spatialBouncy(),
+                    label = "modeTextScale"
                 )
+
+                val containerColor by animateColorAsState(
+                    targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    animationSpec = GXVMotion.fastEffects(),
+                    label = "modeContainerColor"
+                )
+
+                val contentColor by animateColorAsState(
+                    targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color.White.copy(alpha = 0.65f),
+                    animationSpec = GXVMotion.fastEffects(),
+                    label = "modeContentColor"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .onGloballyPositioned { coords ->
+                            itemCentersX[mode] = coords.positionInRoot().x + coords.size.width / 2f
+                        }
+                        .heightIn(min = 40.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(containerColor)
+                        .clickable { onModeSelected(mode) }
+                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = mode.name,
+                        color = contentColor,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 13.sp,
+                        letterSpacing = 0.5.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.scale(textScale)
+                    )
+                }
             }
         }
     }

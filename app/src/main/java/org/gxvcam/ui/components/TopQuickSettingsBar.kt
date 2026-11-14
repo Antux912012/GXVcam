@@ -2,7 +2,6 @@ package org.gxvcam.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gxvcam.ui.state.AgcColorProfile
@@ -26,13 +26,13 @@ import org.gxvcam.ui.state.GridType
 import org.gxvcam.ui.state.SonyAeMode
 import org.gxvcam.ui.state.SonyAfMode
 import org.gxvcam.ui.theme.DarkSurfaceContainerHigh
-import org.gxvcam.ui.theme.GXVMotion
 
 /**
- * Google Camera / Pixel Camera Material 3 Expressive Quick Settings Bar
- * - Cohesive floating glassmorphic islands
- * - Balanced horizontal layout that prevents clipping on all aspect ratios
- * - Integrated haptic feedback and fluid M3 spring menus
+ * Material 3 Expressive + Apple HIG Top Quick Settings Bar
+ * - Everyday modes (PHOTO / PORTRAIT / NIGHT): clean Flash, Aspect Ratio, Grid, and Settings
+ * - VIDEO mode: adds quick Dual Cam toggle
+ * - PRO mode: exposes Color Profile LUT / LibPatcher, Sony AE/AF locks, and RAW/JPG format chip
+ * - Enforces >= 48dp accessible touch targets across all controls
  */
 @Composable
 fun TopQuickSettingsBar(
@@ -58,7 +58,9 @@ fun TopQuickSettingsBar(
     onOpenSettings: () -> Unit = {},
     onOpenLibPatcher: () -> Unit = {},
     isProMode: Boolean = false,
+    isVideoMode: Boolean = false,
     isRawSupported: Boolean = false,
+    isFocusSupported: Boolean = true,
     captureFormat: CaptureFormat = CaptureFormat.JPEG,
     onCycleCaptureFormat: () -> Unit = {},
     isDualCaptureEnabled: Boolean = false,
@@ -75,28 +77,28 @@ fun TopQuickSettingsBar(
     var showAeMenu by remember { mutableStateOf(false) }
     var showAfMenu by remember { mutableStateOf(false) }
 
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .then(
                 if (isFull) Modifier.statusBarsPadding().padding(top = 8.dp)
                 else Modifier.statusBarsPadding()
             )
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
-        // Left Island: Flash Mode & Color Profile LUT pill
+        // Left Island: Flash Mode (always) + Pro LUT / Sony AE & AF (Pro Mode only)
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = buttonContainerColor,
             border = borderStroke,
             tonalElevation = if (isFull) 0.dp else 4.dp,
-            modifier = Modifier.height(40.dp)
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .height(48.dp)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(horizontal = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (isProMode) 0.dp else 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Flash Mode Button
@@ -105,7 +107,7 @@ fun TopQuickSettingsBar(
                         tactile.triggerTick()
                         onCycleFlash()
                     },
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(if (isProMode) 40.dp else 44.dp)
                 ) {
                     Icon(
                         imageVector = when (flashMode) {
@@ -116,130 +118,132 @@ fun TopQuickSettingsBar(
                         },
                         contentDescription = "Flash Mode",
                         tint = if (flashMode != FlashMode.OFF) MaterialTheme.colorScheme.primary else Color.White,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
-                // Color Profile LUT Button
-                Box {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable {
-                                tactile.triggerSnap()
-                                showProfileMenu = true
+                // Pro Mode only: Color Profile LUT & Sony Alpha AE/AF locks
+                if (isProMode) {
+                    Box {
+                        Row(
+                            modifier = Modifier
+                                .heightIn(min = 40.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .clickable {
+                                    tactile.triggerSnap()
+                                    showProfileMenu = true
+                                }
+                                .padding(horizontal = 6.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = "Color Profile",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = activeProfile.label.split(" ").first(),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center,
+                                color = Color.White
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showProfileMenu,
+                            onDismissRequest = { showProfileMenu = false },
+                            modifier = Modifier
+                                .background(Color(0xFF1E1E1E))
+                                .widthIn(min = 220.dp)
+                        ) {
+                            Text(
+                                text = "COLOR PROFILES (LUT)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+
+                            AgcColorProfile.entries.forEach { profile ->
+                                val isSelected = profile == activeProfile
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(
+                                                text = profile.label,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                            )
+                                            Text(
+                                                text = profile.description,
+                                                fontSize = 10.sp,
+                                                color = Color.White.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    },
+                                    trailingIcon = {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        tactile.triggerSnap()
+                                        onSelectProfile(profile)
+                                        showProfileMenu = false
+                                    }
+                                )
                             }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Palette,
-                            contentDescription = "Color Profile",
-                            modifier = Modifier.size(15.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = activeProfile.label.split(" ").first(),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                    }
 
-                    DropdownMenu(
-                        expanded = showProfileMenu,
-                        onDismissRequest = { showProfileMenu = false },
-                        modifier = Modifier
-                            .background(Color(0xFF1E1E1E))
-                            .widthIn(min = 220.dp)
-                    ) {
-                        Text(
-                            text = "COLOR PROFILES (LUT)",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                        )
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-                        AgcColorProfile.entries.forEach { profile ->
-                            val isSelected = profile == activeProfile
                             DropdownMenuItem(
                                 text = {
-                                    Column {
-                                        Text(
-                                            text = profile.label,
-                                            fontSize = 13.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
-                                        )
-                                        Text(
-                                            text = profile.description,
-                                            fontSize = 10.sp,
-                                            color = Color.White.copy(alpha = 0.6f)
-                                        )
-                                    }
-                                },
-                                trailingIcon = {
-                                    if (isSelected) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Selected",
+                                            imageVector = Icons.Default.Tune,
+                                            contentDescription = "LibPatcher",
                                             tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Open LibPatcher...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 },
                                 onClick = {
                                     tactile.triggerSnap()
-                                    onSelectProfile(profile)
                                     showProfileMenu = false
+                                    onOpenLibPatcher()
                                 }
                             )
                         }
-
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
-
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Tune,
-                                        contentDescription = "LibPatcher",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Open LibPatcher...",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            },
-                            onClick = {
-                                tactile.triggerSnap()
-                                showProfileMenu = false
-                                onOpenLibPatcher()
-                            }
-                        )
                     }
-                }
 
-                // In Pro Mode: AE & AF Sony Alpha locks in the top island
-                if (isProMode) {
                     VerticalDivider(
                         color = Color.White.copy(alpha = 0.18f),
                         modifier = Modifier.height(18.dp).padding(horizontal = 2.dp)
                     )
 
                     // Sony AE Mode / Lock Button
-                    Box {
+                    Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = if (isAeLocked) "AE-L" else sonyAeMode.shortLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
                             color = if (isAeLocked) Color(0xFFFFB74D) else Color.White,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
@@ -248,7 +252,7 @@ fun TopQuickSettingsBar(
                                     tactile.triggerSnap()
                                     showAeMenu = true
                                 }
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                .padding(horizontal = 5.dp, vertical = 8.dp)
                         )
 
                         DropdownMenu(
@@ -299,67 +303,70 @@ fun TopQuickSettingsBar(
                         }
                     }
 
-                    // Sony AF Mode / Lock Button
-                    Box {
-                        Text(
-                            text = if (isAfLocked) "AF-L" else sonyAfMode.shortLabel,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isAfLocked) Color(0xFFFFB74D) else Color.White,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isAfLocked) Color(0x33FFB74D) else Color.Transparent)
-                                .clickable {
-                                    tactile.triggerSnap()
-                                    showAfMenu = true
-                                }
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
-                        )
-
-                        DropdownMenu(
-                            expanded = showAfMenu,
-                            onDismissRequest = { showAfMenu = false },
-                            modifier = Modifier.background(Color(0xFF1E1E1E)).widthIn(min = 230.dp)
-                        ) {
+                    // Sony AF Mode / Lock Button (only shown on variable-focus lenses)
+                    if (isFocusSupported) {
+                        Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = "FOCUS MODE & LOCK (SONY)",
+                                text = if (isAfLocked) "AF-L" else sonyAfMode.shortLabel,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                textAlign = TextAlign.Center,
+                                color = if (isAfLocked) Color(0xFFFFB74D) else Color.White,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isAfLocked) Color(0x33FFB74D) else Color.Transparent)
+                                    .clickable {
+                                        tactile.triggerSnap()
+                                        showAfMenu = true
+                                    }
+                                    .padding(horizontal = 5.dp, vertical = 8.dp)
                             )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = if (isAfLocked) "Unlock Focus (AF)" else "Lock Focus (AF-L)",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isAfLocked) Color(0xFFFFB74D) else Color.White
-                                    )
-                                },
-                                onClick = {
-                                    tactile.triggerSnap()
-                                    onToggleAfLock()
-                                    showAfMenu = false
-                                }
-                            )
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
-                            SonyAfMode.entries.forEach { mode ->
-                                val isSelected = (sonyAfMode == mode && !isAfLocked) || (mode == SonyAfMode.AF_L && isAfLocked)
+
+                            DropdownMenu(
+                                expanded = showAfMenu,
+                                onDismissRequest = { showAfMenu = false },
+                                modifier = Modifier.background(Color(0xFF1E1E1E)).widthIn(min = 230.dp)
+                            ) {
+                                Text(
+                                    text = "FOCUS MODE & LOCK (SONY)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                )
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = mode.label,
+                                            text = if (isAfLocked) "Unlock Focus (AF)" else "Lock Focus (AF-L)",
                                             fontSize = 13.sp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isAfLocked) Color(0xFFFFB74D) else Color.White
                                         )
                                     },
                                     onClick = {
                                         tactile.triggerSnap()
-                                        if (mode == SonyAfMode.AF_L) onToggleAfLock() else onSelectAfMode(mode)
+                                        onToggleAfLock()
                                         showAfMenu = false
                                     }
                                 )
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+                                SonyAfMode.entries.forEach { mode ->
+                                    val isSelected = (sonyAfMode == mode && !isAfLocked) || (mode == SonyAfMode.AF_L && isAfLocked)
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = mode.label,
+                                                fontSize = 13.sp,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                            )
+                                        },
+                                        onClick = {
+                                            tactile.triggerSnap()
+                                            if (mode == SonyAfMode.AF_L) onToggleAfLock() else onSelectAfMode(mode)
+                                            showAfMenu = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -367,18 +374,20 @@ fun TopQuickSettingsBar(
             }
         }
 
-        // Center Island: Recording Duration Pill or Aspect Ratio / RAW Format Chip
+        // Center Island: Recording Duration Pill or Aspect Ratio (+ RAW Format Chip in Pro Mode)
         if (isRecording) {
             val totalSeconds = recordingDurationMs / 1000
             val minutes = totalSeconds / 60
             val seconds = totalSeconds % 60
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color(0xDDFF3B30),
-                modifier = Modifier.height(36.dp)
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .height(40.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -392,37 +401,40 @@ fun TopQuickSettingsBar(
                         text = String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds),
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
         } else {
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = buttonContainerColor,
                 border = borderStroke,
                 tonalElevation = if (isFull) 0.dp else 4.dp,
-                modifier = Modifier.height(36.dp)
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .height(44.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp),
+                    modifier = Modifier.padding(horizontal = if (isProMode) 6.dp else 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Capture Format Toggle (JPEG / RAW / RAW+JPEG) in Pro Mode
                     if (isProMode && isRawSupported) {
                         Text(
                             text = captureFormat.shortLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (captureFormat != CaptureFormat.JPEG) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center,
+                            color = if (captureFormat != CaptureFormat.JPEG) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.85f),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     tactile.triggerTick()
                                     onCycleCaptureFormat()
                                 }
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                .padding(horizontal = 6.dp, vertical = 8.dp)
                         )
                         VerticalDivider(
                             color = Color.White.copy(alpha = 0.18f),
@@ -430,67 +442,70 @@ fun TopQuickSettingsBar(
                         )
                     }
 
-                    // Aspect Ratio Toggle
                     Text(
                         text = aspectRatio.label,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
                         color = Color.White,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .clickable {
                                 tactile.triggerTick()
                                 onCycleAspectRatio()
                             }
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .padding(horizontal = if (isProMode) 7.dp else 10.dp, vertical = 8.dp)
                     )
                 }
             }
         }
 
-        // Right Island: Dual Capture PIP, Composition Grid & Settings Gear
+        // Right Island: Dual Cam (Pro/Video only), Composition Grid & Settings Gear
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = buttonContainerColor,
             border = borderStroke,
             tonalElevation = if (isFull) 0.dp else 4.dp,
-            modifier = Modifier.height(40.dp)
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .height(48.dp)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 4.dp),
+                modifier = Modifier.padding(horizontal = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Dual Cam PIP Toggle
-                IconButton(
-                    onClick = {
-                        tactile.triggerSnap()
-                        onToggleDualCapture()
-                    },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PictureInPicture,
-                        contentDescription = "Dual Capture PIP",
-                        tint = if (isDualCaptureEnabled) MaterialTheme.colorScheme.primary else Color.White,
-                        modifier = Modifier.size(19.dp)
-                    )
+                if (isProMode || isVideoMode) {
+                    IconButton(
+                        onClick = {
+                            tactile.triggerSnap()
+                            onToggleDualCapture()
+                        },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PictureInPicture,
+                            contentDescription = "Dual Capture PIP",
+                            tint = if (isDualCaptureEnabled) MaterialTheme.colorScheme.primary else Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
 
-                // Sony Alpha Grid Menu
+                // Composition Grid Menu
                 Box {
                     IconButton(
                         onClick = {
                             tactile.triggerSnap()
                             showGridMenu = true
                         },
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = if (gridEnabled && gridType != GridType.NONE) Icons.Default.GridOn else Icons.Default.GridOff,
                             contentDescription = "Composition Grid",
                             tint = if (gridEnabled && gridType != GridType.NONE) MaterialTheme.colorScheme.primary else Color.White,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
@@ -500,7 +515,7 @@ fun TopQuickSettingsBar(
                         modifier = Modifier.background(Color(0xFF1E1E1E)).widthIn(min = 230.dp)
                     ) {
                         Text(
-                            text = "GRID GUIDES (SONY ALPHA)",
+                            text = "GRID GUIDES",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -550,13 +565,13 @@ fun TopQuickSettingsBar(
                         tactile.triggerSnap()
                         onOpenSettings()
                     },
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
                         tint = Color.White,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

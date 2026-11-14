@@ -1,0 +1,72 @@
+#version 450
+// Vulkan 1.3 compute: Structure-tensor edge-directed demosaic + synthetic 16-stop LOFIC highlight fusion.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, r16f) uniform readonly image2D uMergedEv0Bayer;
+layout(binding = 1, r16f) uniform readonly image2D uHighlightEvMinusBayer;
+layout(binding = 2, rgba16f) uniform writeonly image2D uLinearRec2020Out;
+
+layout(push_constant) uniform LoficPC {
+    vec4 awbGains;       // Sanitized CIE 1976 (u', v') RGGB gains
+    float evRatio;       // 5.65685 (-2.5 EV highlight scale)
+    float highlightKnee; // 0.85 cosine transition knee
+    int cfaPattern;      // 0=RGGB, 1=GRBG, 2=GBRG, 3=BGGR
+} pc;
+
+float safeLoad(bool useEv0, ivec2 p, ivec2 dims) {
+    ivec2 c = clamp(p, ivec2(0), dims - ivec2(1));
+    return useEv0 ? imageLoad(uMergedEv0Bayer, c).r : imageLoad(uHighlightEvMinusBayer, c).r;
+}
+
+vec3 sampleAnisotropicDemosaic(bool useEv0, ivec2 p, ivec2 dims) {
+    float c  = safeLoad(useEv0, p, dims);
+    float l  = safeLoad(useEv0, p + ivec2(-1, 0), dims);
+    float r  = safeLoad(useEv0, p + ivec2( 1, 0), dims);
+    float u  = safeLoad(useEv0, p + ivec2( 0,-1), dims);
+    float d  = safeLoad(useEv0, p + ivec2( 0, 1), dims);
+    float ul = safeLoad(useEv0, p + ivec2(-1,-1), dims);
+    float ur = safeLoad(useEv0, p + ivec2( 1,-1), dims);
+    float dl = safeLoad(useEv0, p + ivec2(-1, 1), dims);
+    float dr = safeLoad(useEv0, p + ivec2( 1, 1), dims);
+
+    float gx = (r - l) * 0.5;
+    float gy = (d - u) * 0.5;
+    float wH = 1.0 / (1.0 + 32.0 * gx * gx);
+    float wV = 1.0 / (1.0 + 32.0 * gy * gy);
+    float dirGreen = (wH * (l + r) * 0.5 + wV * (u + d) * 0.5) / max(wH + wV, 1e-5);
+    float diagAvg = 0.25 * (ul + ur + dl + dr);
+
+    int rawPhase = (p.y & 1) * 2 + (p.x & 1);
+    // Remap CFA pattern to canonical RGGB phase (0=R, 1=Gr, 2=Gb, 3=B)
+    int phase = rawPhase ^ pc.cfaPattern;
+
+    vec3 rgb;
+    if (phase == 0) {
+        rgb = vec3(c, dirGreen, diagAvg);
+    } else if (phase == 1) {
+        rgb = vec3(0.5 * (l + r), c, 0.5 * (u + d));
+    } else if (phase == 2) {
+        rgb = vec3(0.5 * (u + d), c, 0.5 * (l + r));
+    } else {
+        rgb = vec3(diagAvg, dirGreen, c);
+    }
+    return max(rgb, vec3(0.0)) * vec3(pc.awbGains.x, pc.awbGains.y, pc.awbGains.w);
+}
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 dims = imageSize(uMergedEv0Bayer);
+    if (gid.x >= dims.x || gid.y >= dims.y) return;
+
+    vec3 ev0Rgb = sampleAnisotropicDemosaic(true, gid, dims);
+    vec3 evMinusRgb = sampleAnisotropicDemosaic(false, gid, dims) * pc.evRatio;
+
+    float maxChan = max(ev0Rgb.r, max(ev0Rgb.g, ev0Rgb.b));
+    float knee = clamp(pc.highlightKnee, 0.50, 0.98);
+    float t = clamp((maxChan - knee) / max(1.0 - knee, 1e-4), 0.0, 1.0);
+    float cosineWeight = 0.5 - 0.5 * cos(t * 3.14159265);
+    vec3 fusedLinear = mix(ev0Rgb, max(evMinusRgb, ev0Rgb), cosineWeight);
+
+    imageStore(uLinearRec2020Out, gid, vec4(fusedLinear, 1.0));
+}
